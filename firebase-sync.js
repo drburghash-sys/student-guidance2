@@ -115,6 +115,14 @@
       listeners.push(unsub);
     }
   }
+  // Sensitive school data may only be imported from a dedicated Firebase
+  // Hosting origin, NOT shared-owner GitHub Pages (or localhost).
+  const approvedWebOrigin=()=>{
+    if(typeof location==='undefined'||location.protocol!=='https:')return false;
+    const hostname=String(location.hostname||'').toLowerCase();
+    return hostname===String(config.projectId).toLowerCase()+'.web.app'
+        || hostname===String(config.projectId).toLowerCase()+'.firebaseapp.com';
+  };
   // Owner-confirmed, create-only import. Never overwrites existing records.
   // The caller must pass explicit user attestation and a known valid session;
   // data is transmitted only after the person presses Import.
@@ -123,6 +131,7 @@
       throw Error('هذه الفئة غير مسموح باستيرادها.');
     if(opts?.userConfirmed!==true)
       throw Error('لا يمكن البدء دون إقرار المستخدم الصريح بصلاحية نقل البيانات.');
+    if(!approvedWebOrigin())throw Error('استيراد بيانات حقيقية محجوب على GitHub Pages. انشري التطبيق أولاً على Firebase Hosting.');
     const {c,s}=await collectionFor(table);
     if(!Array.isArray(rows)||rows.length>10000)throw Error('قائمة السجلات غير صالحة.');
     let inserted=0,existing=0;
@@ -159,6 +168,6 @@
     user:()=>authUser,
     setAuthObserver:callback=>{notifyAuth=callback;},
     ensureSession,signIn,bootstrapUid,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,
-    allowLegacyImport:()=>Boolean(config.allowedUid && config.mode==='demo')
+    allowLegacyImport:()=>Boolean(config.allowedUid && config.mode==='demo' && approvedWebOrigin())
   };
 })();
