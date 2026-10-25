@@ -28,7 +28,16 @@ async function seedDemo(){if(CloudClient.ready()||(await get('meta','seed'))?.ye
 const live=table=>state[table].filter(x=>!x.is_deleted&&x.school_code===state.school);const byId=id=>state.students.find(s=>s.id===id)?.name||'غير مسجلة';
 function navigate(page){state.page=page;document.querySelectorAll('.page').forEach(el=>el.classList.toggle('hidden',el.id!==page));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('selected',b.dataset.page===page));render()}
 function card(title,meta='',buttons=''){return `<article class="list-card"><div><h3>${title}</h3><div class="meta">${meta}</div></div><div class="buttons">${buttons}</div></article>`}
-function render(){const students=live('students'),entries=live('entries'),tasks=live('tasks');$('stats').innerHTML=[['الطالبات',students.length],['متابعات مفتوحة',entries.filter(x=>x.status==='مفتوحة').length],['مواقف وسجلات',entries.length],['مهام غير منتهية',tasks.filter(x=>!x.done).length]].map(([k,v])=>`<div class="stat"><small>${k}</small><strong>${v}</strong></div>`).join('');$('modules').innerHTML=types.map((name,i)=>`<button class="module" data-type="${i}"><span class="emoji">${icons[i]}</span><b>${name}</b><small>${entries.filter(x=>x.type===name).length} سجل</small></button>`).join('');$('recent').innerHTML=entries.slice().sort((a,b)=>b.updated_at.localeCompare(a.updated_at)).slice(0,4).map(e=>entryCard(e)).join('')||empty('لا توجد سجلات بعد');renderStudents();renderEntries();renderTasks();renderReports();renderLegacy();renderSyncInfo()}
+function updateSchoolSwitcher(){
+ const label=$('currentSchoolName');
+ if(label)label.textContent=schoolName(state.school);
+ document.querySelectorAll('#schoolSwitcher [data-school-choice]').forEach(button=>{
+   const isCurrent=button.dataset.schoolChoice===state.school;
+   button.classList.toggle('active',isCurrent);
+   button.setAttribute('aria-pressed',String(isCurrent));
+ });
+}
+function render(){updateSchoolSwitcher();const students=live('students'),entries=live('entries'),tasks=live('tasks');$('stats').innerHTML=[['الطالبات',students.length],['متابعات مفتوحة',entries.filter(x=>x.status==='مفتوحة').length],['مواقف وسجلات',entries.length],['مهام غير منتهية',tasks.filter(x=>!x.done).length]].map(([k,v])=>`<div class="stat"><small>${k}</small><strong>${v}</strong></div>`).join('');$('modules').innerHTML=types.map((name,i)=>`<button class="module" data-type="${i}"><span class="emoji">${icons[i]}</span><b>${name}</b><small>${entries.filter(x=>x.type===name).length} سجل</small></button>`).join('');$('recent').innerHTML=entries.slice().sort((a,b)=>b.updated_at.localeCompare(a.updated_at)).slice(0,4).map(e=>entryCard(e)).join('')||empty('لا توجد سجلات بعد');renderStudents();renderEntries();renderTasks();renderReports();renderLegacy();renderSyncInfo()}
 function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function studentCard(s){const count=live('entries').filter(e=>e.student_id===s.id).length;return card(esc(s.name),`${esc(s.grade)} • فصل ${esc(s.class_name)} • ${count} سجلات`,`<button data-profile="${s.id}">الملف</button><button data-edit="students:${s.id}">تعديل</button><button data-remove-student="${s.id}" aria-label="حذف الطالبة ${esc(s.name)}">حذف</button>`)}
 function renderStudents(){const school=live('students'),grades=[...new Set(school.map(x=>x.grade))].sort();const old=$('studentGrade').value;$('studentGrade').innerHTML='<option value="">كل الصفوف</option>'+grades.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');$('studentGrade').value=grades.includes(old)?old:'';const term=$('studentSearch').value.trim().toLowerCase(),grade=$('studentGrade').value;const filtered=school.filter(x=>(!grade||x.grade===grade)&&(`${x.name} ${x.grade} ${x.class_name}`.toLowerCase().includes(term)));$('studentList').innerHTML=filtered.map(studentCard).join('')||empty('لا توجد طالبات مطابقة')}
@@ -469,7 +478,16 @@ async function syncCloud(){
    notify('المزامنة غير مكتملة: '+(String(error.message||error).includes('CONFLICT')?'هناك تعديل متعارض محفوظ على هذا الجهاز':error.message));
  }finally{busy=false}
 }
-function setup(){document.body.addEventListener('click',handleClick);$('school').addEventListener('change',e=>{state.school=e.target.value;$('studentProfile').classList.add('hidden');render()});$('studentSearch').addEventListener('input',renderStudents);$('studentGrade').addEventListener('change',renderStudents);for(const id of ['recordSearch','recordType','recordStatus'])$(id).addEventListener('input',renderEntries);for(const id of ['legacySearch','legacyCategory'])$(id).addEventListener('input',renderLegacy);for(const id of ['fromDate','toDate','reportType','reportStatus','showNames'])$(id).addEventListener('change',renderReports);$('quickAdd').onclick=()=>openEditor('entries');$('addRecord').onclick=()=>openEditor('entries');$('addStudent').onclick=()=>openEditor('students');$('addTask').onclick=()=>openEditor('tasks');$('closeEditor').onclick=$('cancelEditor').onclick=()=>$('editor').close();$('editorForm').addEventListener('submit',saveEditor);
+function setup(){document.body.addEventListener('click',handleClick);
+$('schoolSwitcher').addEventListener('click',e=>{
+ const choice=e.target.closest('[data-school-choice]');
+ if(!choice)return;
+ const code=choice.dataset.schoolChoice;
+ if(!['p31','m34'].includes(code)||code===state.school)return;
+ state.school=code;
+ $('studentProfile').classList.add('hidden');
+ render();
+});$('studentSearch').addEventListener('input',renderStudents);$('studentGrade').addEventListener('change',renderStudents);for(const id of ['recordSearch','recordType','recordStatus'])$(id).addEventListener('input',renderEntries);for(const id of ['legacySearch','legacyCategory'])$(id).addEventListener('input',renderLegacy);for(const id of ['fromDate','toDate','reportType','reportStatus','showNames'])$(id).addEventListener('change',renderReports);$('quickAdd').onclick=()=>openEditor('entries');$('addRecord').onclick=()=>openEditor('entries');$('addStudent').onclick=()=>openEditor('students');$('addTask').onclick=()=>openEditor('tasks');$('closeEditor').onclick=$('cancelEditor').onclick=()=>$('editor').close();$('editorForm').addEventListener('submit',saveEditor);
  $('formFields').addEventListener('input',e=>{
    if(e.target.id==='studentQuickSearch'){
      $('f_student_id').value='';
