@@ -52,6 +52,10 @@ async function transform(db,school,owner){
  const students=[],records=[],ids=new Map(),stamp=new Date().toISOString();
  const nameKeys=new Map();
  for(const [category,rows] of Object.entries(CATEGORY)){
+  const idFrequency=new Map();
+  for(const row of (db[category]||[])){
+    if(row?.id!==undefined&&row?.id!==null){const k=String(row.id);idFrequency.set(k,(idFrequency.get(k)||0)+1)}
+  }
   for(const [i,row] of (db[category]||[]).entries()){
    if(!row||typeof row!=='object'||Array.isArray(row))throw Error('سجل غير صالح في '+rows+' رقم '+(i+1));
    const name=category==='events'?'':canon(row.name),grade=canon(row.grade),className=canon(row.classroom||row.class_name);
@@ -65,7 +69,9 @@ async function transform(db,school,owner){
     }studentId=nameKeys.get(key);
    }
    const original=JSON.stringify(row);
-   const u=await makeId('student-guidance-legacy-row|'+school+'|'+category+'|'+i+'|'+original);
+   const stableId=row.id!==undefined&&row.id!==null&&String(row.id)!==''&&idFrequency.get(String(row.id))===1;
+   const provenance=stableId?'old-id|'+String(row.id):'fallback|'+i+'|'+original;
+   const u=await makeId('student-guidance-legacy-row|'+school+'|'+category+'|'+provenance);
    records.push({id:u.id,owner_id:owner,school_code:school,category,student_id:studentId,student_name:name,grade,class_name:className,source_key:u.hash,source_index:i,source_id:String(row.id??''),event_date:isDate(row.date),raw_data:row,updated_at:stamp,is_deleted:false});
   }
  }
