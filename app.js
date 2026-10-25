@@ -282,8 +282,14 @@ async function saveEditor(e){
        value.student_name=name;
      }else{
        const existing=live('students').find(s=>s.id===value.student_id);
-       if(!existing)throw Error('اختاري الطالبة من نتائج البحث، أو اضغطي «إضافة طالبة جديدة».');
-       value.student_name=existing.name;
+       // Legacy events and multi-name cases may have no single student profile.
+       // Permit editing their documented follow-up status without inventing
+       // a pupil identity, as long as the picker was not changed.
+       const unchangedUnlinkedLegacy=Boolean(old?.source_legacy_id && !old.student_id &&
+          !value.student_id && !$('studentQuickSearch').value.trim());
+       if(!existing&&!unchangedUnlinkedLegacy)
+         throw Error('اختاري الطالبة من نتائج البحث، أو اضغطي «إضافة طالبة جديدة».');
+       if(existing)value.student_name=existing.name;
      }
      if(old?.source_legacy_id)value.details_override=value.notes;
      if(freshStudent){
