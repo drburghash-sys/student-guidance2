@@ -5,7 +5,7 @@ const dbName='guidance-v2-demo-2026',tables=['students','entries','tasks','legac
 const $=x=>document.getElementById(x),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=()=>new Date().toISOString(),today=()=>new Date().toLocaleDateString('en-CA'),uuid=()=>crypto.randomUUID(),schoolName=s=>s==='p31'?'الابتدائية ٣١':'المتوسطة ٣٤';
 function notify(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('toast').style.display='none',3300)}
-function startDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(dbName,1);req.onupgradeneeded=()=>{const d=req.result;for(const name of [...tables,'queue','meta'])if(!d.objectStoreNames.contains(name))d.createObjectStore(name,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+function startDB(){return new Promise((resolve,reject)=>{const req=indexedDB.open(dbName,2);req.onupgradeneeded=()=>{const d=req.result;for(const name of [...tables,'queue','meta'])if(!d.objectStoreNames.contains(name))d.createObjectStore(name,{keyPath:'id'})};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
 function tx(store,mode='readonly'){return db.transaction(store,mode).objectStore(store)}
 function all(name){return new Promise((ok,no)=>{const q=tx(name).getAll();q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)})}
 function get(name,id){return new Promise((ok,no)=>{const q=tx(name).get(id);q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)})}
