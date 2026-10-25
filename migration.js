@@ -1,6 +1,6 @@
 'use strict';
 (() => {
-const LABELS={daily:'المواقف اليومية',attendance:'الغياب والمواظبة',behavior:'السلوك',health:'الحالات الصحية',social:'الحالات الاجتماعية',material:'الحالات المادية',events:'البرامج والفعاليات',guardians:'أولياء الأمور',followup:'المتابعة',honor:'التكريم',academic:'التحصيل الدراسي'};
+const LABELS={daily:'المواقف اليومية الطارئة',attendance:'الغياب والمواظبة',behavior:'المخالفات والسلوك',health:'الحالات الصحية',social:'الحالات الاجتماعية',material:'الحالات المادية',events:'البرامج والفعاليات',guardians:'التواصل مع أولياء الأمور',followup:'الطالبات المحتاجات للمتابعة',honor:'تكريم الطالبات',academic:'التحصيل الدراسي'};
 const $=id=>document.getElementById(id);
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
 const arNums=x=>String(x??'').replace(/[٠-٩]/g,d=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/[۰-۹]/g,d=>String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
@@ -8,7 +8,7 @@ const norm=x=>arNums(x).normalize('NFKC').replace(/[\u064b-\u065f\u0670]/g,'').r
 const schoolLabel=x=>x==='p31'?'الابتدائية ٣١':x==='m34'?'المتوسطة ٣٤':'غير محددة';
 let source=null, rows=[], selected=new Map(), inspection=null, loading=false;
 function status(msg){$('progress').textContent=msg}
-function clear(){source=null;rows=[];selected.clear();inspection=null;$('sourceInfo').textContent='لا يوجد مصدر مفتوح.';for(const id of ['schoolStats','countTable','reviewList'])$(id).innerHTML='';$('qualityMessage').textContent='';$('backupFile').value='';status('');availability()}
+function clear(){source=null;rows=[];selected.clear();inspection=null;$('sourceInfo').textContent='لا يوجد مصدر مفتوح.';for(const id of ['schoolStats','countTable','reviewList'])$(id).innerHTML='';$('qualityMessage').textContent='';$('backupFile').value='';for(const k of ['authorizedImport','keepBackup'])$(k).checked=false;status('');availability()}
 function explicitSchool(row){
  const s=norm(row.school_code||row.school||'').toLowerCase();
  if(['p31','ابتدائيه 31','الابتدائية 31'].includes(s))return 'p31';
@@ -74,8 +74,14 @@ function render(){
 function availability(){
  const count=rows.filter(r=>!assigned(r)).length;
  const cloudReady=CloudClient.ready(),logged=!!CloudClient.user(),approved=CloudClient.allowLegacyImport?.()===true;
- $('transfer').disabled=loading||!inspection||!inspection.total||count>0||!cloudReady||!logged||!approved;
- $('cloudInfo').textContent=!approved?'استيراد سجلات الطالبات الحقيقية إلى Firebase معطل صراحةً في هذه المرحلة؛ هذه أداة فحص محلي فقط.':!cloudReady?'لم يجهز اتصال Firebase بعد.':!logged?'يرجى تسجيل الدخول بالحساب المعتمد.':count?'توجد '+count+' سجلات لم تُحدد مدرستها.':'تحققي من موافقة الجهة ونسخة احتياطية مستقلة قبل النقل.';
+ const consent=$('authorizedImport').checked,backup=$('keepBackup').checked;
+ $('transfer').disabled=loading||!inspection||!inspection.total||count>0||!cloudReady||!logged||!approved||!consent||!backup;
+ $('cloudInfo').textContent=!cloudReady?'إعداد Firebase غير مكتمل.':
+   !logged?'لا توجد جلسة Firebase معتمدة في هذه الصفحة. افتحي البرنامج وسجلي الدخول ثم عودي لأداة الترحيل.':
+   !approved?'يتعذر الاستيراد: حساب Firebase غير معتمد.':
+   count?'حددي مدرسة كل سجل غير واضح قبل الاستيراد ('+count+' سجلات).':
+   !consent||!backup?'أقري بوجود تصريح من الجهة المسؤولة وبقاء نسخة احتياطية آمنة، حتى يتاح زر النقل.':
+   'جاهز للنقل بعد التأكيد النهائي. ستُرسل السجلات إلى Firestore؛ قد يتعذر التراجع دون إجراء إداري منفصل.';
 }
 function validate(json){
  const db=json?.db??json;
@@ -101,48 +107,91 @@ $('reviewList').addEventListener('change',ev=>{const key=ev.target.dataset?.assi
 $('clearPreview').onclick=clear;
 async function idFor(text){const hash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));const n=new Uint8Array(hash).slice(0,16);n[6]=(n[6]&15)|80;n[8]=(n[8]&63)|128;const h=Array.from(n).map(x=>x.toString(16).padStart(2,'0')).join('');return [h.slice(0,8),h.slice(8,12),h.slice(12,16),h.slice(16,20),h.slice(20)].join('-')}
 async function prepare(owner){
- const students=[],records=[],studentIds=new Map(),frequencies=new Map(),time=new Date().toISOString();
- for(const r of rows){const key=r.cat+'|'+String(r.data.id??'');frequencies.set(key,(frequencies.get(key)||0)+1)}
+ const students=[],records=[],entries=[],studentIds=new Map(),frequencies=new Map(),time=new Date().toISOString();
+ for(const r of rows){const k=r.cat+'|'+String(r.data.id??'');frequencies.set(k,(frequencies.get(k)||0)+1)}
  for(const r of rows){
   const school=assigned(r);
-  if(!school)throw Error('يوجد سجل لم تحددي مدرسته.');
-  const item=r.data, name=String(item.name||'').trim(),grade=String(item.grade||'').trim(),cls=String(item.classroom||item.class_name||'').trim();
+  if(!school)throw Error('توجد سجلات لم تُحدد مدرستها.');
+  const item=r.data,name=String(item.name||'').trim(),
+    grade=String(item.grade||'').trim(),cls=String(item.classroom||item.class_name||'').trim();
+  // Only confidently identified names become a student profile. Short/multiple names
+  // stay verbatim in the archive and entry — no accidental student merging.
   let studentId=null;
-  if(name&&!r.multi&&r.cat!=='events'){
-   const normalized=[school,nameKey(item),norm(grade),norm(cls)].join('|');
-   if(!studentIds.has(normalized)){
-      const id=await idFor('guidance-v2-student|'+normalized);
-      studentIds.set(normalized,id);
-      students.push({id,owner_id:owner,school_code:school,name,grade:grade||'غير محدد',class_name:cls||'غير محدد',updated_at:time,is_deleted:false});
-   }
-   studentId=studentIds.get(normalized);
+  if(name&&!r.multi&&r.cat!=='events'&&norm(name).split(' ').length>=3&&grade){
+    const key=[school,nameKey(item),norm(grade),norm(cls)].join('|');
+    if(!studentIds.has(key)){
+      const id=await idFor('guidance-v2-student|'+key);
+      studentIds.set(key,id);
+      students.push({id,owner_id:owner,school_code:school,name,grade,
+        class_name:cls||'غير محدد',updated_at:time,revision:1,is_deleted:false});
+    }
+    studentId=studentIds.get(key);
   }
-  const key=r.cat+'|'+String(item.id??'');
-  const stable=item.id!==undefined&&item.id!==null&&frequencies.get(key)===1;
+  const k=r.cat+'|'+String(item.id??'');
+  const stable=item.id!==undefined&&item.id!==null&&frequencies.get(k)===1;
   const identifier=stable?'source-id|'+String(item.id):'content-and-position|'+r.index+'|'+JSON.stringify(item);
   const id=await idFor('guidance-v2-archive|'+school+'|'+r.cat+'|'+identifier);
-  records.push({id,owner_id:owner,school_code:school,category:r.cat,student_id:studentId,student_name:name,grade,class_name:cls,source_key:id,source_index:r.index,source_id:String(item.id??''),event_date:/^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))?item.date:null,raw_data:item,updated_at:time,is_deleted:false});
+  const base={id,owner_id:owner,school_code:school,category:r.cat,student_id:studentId,
+    student_name:name,grade,class_name:cls,source_key:id,source_index:r.index,
+    source_id:String(item.id??''),event_date:/^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))?item.date:null,
+    raw_data:item,updated_at:time,revision:1,is_deleted:false};
+  records.push(base);
+  const detail=[item.type,item.reason,item.notes].filter(x=>String(x||'').trim()).map(String).join(' — ');
+  const detail2=[item.result,item.lives&&('المعيشة: '+item.lives),item.level&&('الأهمية: '+item.level),
+    item.status&&('الحالة الأصلية: '+item.status),item.follow&&('متابعة: '+item.follow)]
+    .filter(x=>String(x||'').trim()).map(String).join(' — ');
+  const currentStatus=['مفتوحة','مغلقة'].includes(item.status)?item.status:'غير محددة';
+  entries.push({
+    id:await idFor('guidance-v2-entry|'+id),owner_id:owner,school_code:school,
+    student_id:studentId,student_name:name,type:LABELS[r.cat],
+    date:base.event_date||'',status:currentStatus,notes:detail,action_note:detail2,
+    source_legacy_id:id,updated_at:time,revision:1,is_deleted:false
+  });
  }
- return {students,records};
+ return {students,records,entries};
 }
 $('transfer').onclick=async()=>{
  if(loading||!source||!inspection||rows.some(r=>!assigned(r)))return;
- if(CloudClient.allowLegacyImport?.()!==true){status('نقل البيانات الحقيقية إلى Firebase محظور حتى اعتماد الأمان والخصوصية.');return}
+ if(!$('authorizedImport').checked||!$('keepBackup').checked){
+   status('لم يجر أي نقل؛ يلزم إقرار التصريح وحفظ نسخة احتياطية أولًا.');availability();return;
+ }
+ if(!CloudClient.allowLegacyImport?.()){
+   status('لم يجر أي نقل؛ الحساب غير جاهز أو غير مصرح بالاستيراد.');availability();return;
+ }
  const session=await CloudClient.ensureSession();
- if(!session){status('انتهت جلسة الدخول. لم تُرسل بيانات.');availability();return}
- if(!confirm('تأكيد أخير: هل تمت الموافقة على مكان التخزين والربط ونقل بيانات جميع الطالبات؟ لا يمكن التراجع تلقائيًا عن استيراد سحابي.'))return;
+ if(!session){status('جلسة الدخول غير نشطة؛ لم تُنقل سجلات.');availability();return}
+ const expectedCount=inspection.total;
+ if(!confirm('تنبيه: هل تؤكدين وجود تفويض من الجهة التعليمية لحفظ بيانات الطالبات على Firebase، وأن عدد '+expectedCount+' سجلاً وتصنيف المدرستين صحيحان، ولديك نسخة احتياطية منفصلة؟ سيجري رفع بيانات حساسة إلى السحابة عند الموافقة.'))return;
  loading=true;availability();
  try{
    const payload=await prepare(session.user.id);
-   status('بدء نقل '+payload.students.length+' ملفًا و'+payload.records.length+' سجلًا إلى الاستضافة المعتمدة.');
-   await CloudClient.insertManyIfMissing('students',payload.students,25,n=>status('ملفات الطالبات: '+n+'/'+payload.students.length));
-   await CloudClient.insertManyIfMissing('legacy_records',payload.records,20,n=>status('السجلات: '+n+'/'+payload.records.length));
-   const all=await CloudClient.fetchAll('legacy_records'),ids=new Set(all.map(r=>r.id));
-   const absent=payload.records.filter(r=>!ids.has(r.id));
-   if(absent.length)throw Error('تعذر التأكد من '+absent.length+' سجلات؛ أبقي الملف القديم محفوظًا.');
-   status('تم التحقق من وجود '+payload.records.length+' سجلًا في الأرشيف السحابي. افحصي العرض على جهاز ثان قبل اعتماد النقل.');
- }catch(err){status('النقل غير مكتمل: '+err.message+'؛ لا تحذفي النسخة الأصلية. إعادة الاستيراد لا تُنشئ تكرارات للمعرّفات نفسها.')}
- finally{loading=false;availability()}
+   status('عدد السجلات الأصلية '+expectedCount+'. تجهيز '+payload.students.length+' ملفات طالبات و'+payload.records.length+' سجلات أصلية.');
+   const confirmed={userConfirmed:true};
+   // Import archive first, followed by display entries, then confident student profiles.
+   const parts=[['legacy_records',payload.records,'الأرشيف الأصلي'],
+     ['entries',payload.entries,'السجلات المصنفة'],['students',payload.students,'ملفات الطالبات']];
+   for(const [table,items,label] of parts){
+     const stats=await CloudClient.insertManyIfMissing(table,items,15,
+       (n,counts)=>status(label+': '+n+'/'+items.length+' | جديد: '+counts.inserted+' | موجود سابقاً: '+counts.existing),
+       confirmed);
+     status(label+': تم التحقق من رفع '+stats.total+' سجلًا (جديد: '+stats.inserted+' / موجود: '+stats.existing+').');
+   }
+   const archive=await CloudClient.fetchAll('legacy_records');
+   const display=await CloudClient.fetchAll('entries');
+   const aIds=new Set(archive.map(x=>x.id)),dIds=new Set(display.map(x=>x.id));
+   const missingA=payload.records.filter(x=>!aIds.has(x.id));
+   const missingD=payload.entries.filter(x=>!dIds.has(x.id));
+   if(missingA.length||missingD.length)throw Error('التحقق غير مكتمل: سجلات الأرشيف الناقصة '+missingA.length+'، والمدخلات الناقصة '+missingD.length);
+   status('اكتمل النقل والتحقق: '+payload.records.length+' سجلًا أصليًا و'+payload.entries.length+' سجلًا معروضًا، مع '+payload.students.length+' ملف طالبة مؤكد الاسم. لا تحذفي النسخة القديمة قبل اختبار الأجهزة الأربعة والتقارير.');
+ }catch(err){
+   status('لم يكتمل النقل بالكامل: '+err.message+'؛ احتفظي بالمصدر. إعادة المحاولة لا تستبدل السجلات الموجودة وتمنع التكرار.');
+ }finally{loading=false;availability()}
 };
+$('authorizedImport').addEventListener('change',availability);
+$('keepBackup').addEventListener('change',availability);
+// Firebase Auth restores an existing session on this separate page. It must be
+// initialized before deciding whether to allow transferring any records.
+CloudClient.ensureSession().then(availability).catch(()=>availability());
+
 availability();
 })();
