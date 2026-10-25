@@ -27,7 +27,12 @@ service cloud.firestore {
         resource.data.owner_id == uid &&
         request.resource.data.school_code == resource.data.school_code &&
         request.resource.data.revision == resource.data.revision + 1;
-      allow delete: if false;
+      // Owner-only deletion of the exact selected document; never open writes.
+      // Cascading related documents is validated by the app's server transaction.
+      allow delete: if authorized(uid) && knownTable(table) &&
+        resource.data.id == documentId &&
+        resource.data.owner_id == uid &&
+        resource.data.school_code in ['p31','m34'];
     }
     match /{document=**} {
       allow read, write: if false;
