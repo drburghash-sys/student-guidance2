@@ -311,16 +311,28 @@ async function saveEditor(e){
 async function removeStudentSafely(id){
  const student=state.students.find(s=>s.id===id&&!s.is_deleted&&s.school_code===state.school);
  if(!student){notify('لم يتم العثور على الطالبة في المدرسة الحالية.');return}
- const linked=state.entries.filter(e=>e.student_id===id&&!e.is_deleted);
+ let linked=state.entries.filter(e=>e.student_id===id&&!e.is_deleted);
+ if(CloudClient.ready()){
+   if(!navigator.onLine){
+     notify('لحماية السجلات، الحذف متاح أثناء الاتصال بالإنترنت فقط.');return;
+   }
+   try{
+     // Verify against Firestore rather than trusting an incomplete local cache.
+     const remote=await CloudClient.fetchAll('entries');
+     linked=linked.concat(remote.filter(e=>e.student_id===id&&!e.is_deleted));
+   }catch(error){
+     notify('تعذر التحقق من السجلات المرتبطة؛ لم تُحذف الطالبة.');return;
+   }
+ }
  if(linked.length){
-   alert('لم تُحذف الطالبة: توجد '+linked.length+' سجلات مرتبطة بها. حفاظًا على السجلات القديمة، صحّحي بياناتها بزر «تعديل»، أو راجعي ارتباط الحالات قبل الحذف.');
+   alert('لم تُحذف الطالبة: توجد سجلات مرتبطة بها. حفاظًا على السجلات القديمة، صحّحي بياناتها بزر «تعديل»، أو راجعي ارتباط الحالات قبل الحذف.');
    return;
  }
  if(!confirm('حذف الطالبة «'+student.name+'» من قائمة '+schoolName(student.school_code)+'؟\nلن تُحذف أي سجلات أو بيانات لطالبات أخريات. ستُخفى الطالبة من القائمة ويُحفظ تعديل الحذف في Firebase عند اكتمال المزامنة.'))return;
  try{
    await save('students',{...student,is_deleted:true});
    $('studentProfile').classList.add('hidden');
-   notify('أُخفيت الطالبة المحددة من القائمة؛ لم تتغير بقية السجلات.');
+   notify('أُخفيت الطالبة المحددة؛ تحققي من اكتمال المزامنة مع Firebase.');
  }catch(error){notify('لم يكتمل حذف الطالبة: '+String(error.message||error))}
 }
 async function handleClick(e){const b=e.target.closest('button');if(!b)return;if(b.dataset.page)navigate(b.dataset.page);if(b.dataset.type!==undefined){$('recordType').value=types[Number(b.dataset.type)];navigate('records')}if(b.dataset.profile)showProfile(b.dataset.profile);if(b.dataset.removeStudent)await removeStudentSafely(b.dataset.removeStudent);if(b.dataset.closeprofile)$('studentProfile').classList.add('hidden');if(b.dataset.newrecord)openEditor('entries',null,b.dataset.newrecord);if(b.dataset.edit){const [kind,id]=b.dataset.edit.split(':');openEditor(kind,id)}if(b.dataset.toggleentry){const x=state.entries.find(v=>v.id===b.dataset.toggleentry);if(x&&['مفتوحة','مغلقة'].includes(x.status))await save('entries',{...x,status:x.status==='مفتوحة'?'مغلقة':'مفتوحة'});else if(x)openEditor('entries',x.id)}if(b.dataset.toggletask){const x=state.tasks.find(v=>v.id===b.dataset.toggletask);if(x)await save('tasks',{...x,done:!x.done})}}
