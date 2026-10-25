@@ -54,22 +54,20 @@ if(selected.length>300)box.innerHTML+='<p>يظهر أول ٣٠٠ سجل؛ است
 
 function renderSyncInfo(){
  const enabled=CloudClient.ready(),user=CloudClient.user(),
-       uid=CloudClient.bootstrapUid?.(),confirmLink=CloudClient.needsEmailConfirmation?.(),s=$('syncStatus');
- s.textContent=!enabled?'Firebase غير مربوط':user?'Firebase • حساب تجريبي'
-   :uid?'بانتظار اعتماد UID':confirmLink?'تأكيد البريد':'الدخول بالرابط';
- s.className='status '+(user?'online':enabled?'warn':'');
+       uid=CloudClient.bootstrapUid?.(),status=$('syncStatus');
+ status.textContent=!enabled?'Firebase غير مربوط':user?'Firebase • متصل'
+   :uid?'بانتظار اعتماد UID':'الدخول بكلمة المرور';
+ status.className='status '+(user?'online':enabled?'warn':'');
  $('cloudMessage').textContent=!enabled
-   ?'تسجيل الدخول عبر Firebase غير مهيأ. تجربة ببيانات وهمية فقط.'
-   :user?'الحساب التجريبي: '+(user.email||'مستخدم مصرح')+' — سجلات وهمية فقط؛ مزامنة Firebase مفعلة للحساب المعتمد.'
-   :uid?'تم تأكيد ملكية البريد. انسخي UID لربطه بقاعدة Firestore، وبعدها سيعمل نفس الحساب على الأجهزة الأربعة.'
-   :confirmLink?'فُتح رابط الدخول على جهاز أو متصفح آخر. اكتبي البريد الإلكتروني نفسه لإكمال الدخول.'
-   :'أدخلي بريدك الإلكتروني ليصل رابط تسجيل الدخول دون كلمة مرور. التجربة بسجلات وهمية فقط.';
+   ?'لم يتم تهيئة Firebase بعد. نسخة تجريبية ببيانات وهمية فقط.'
+   :user?'تم تسجيل الدخول إلى حساب Firebase التجريبي. لا تدخلي بيانات طالبات حقيقية.'
+   :uid?'تم تسجيل الدخول بنجاح. يلزم ربط UID بحساب الموجّهة في قواعد Firestore قبل تفعيل المزامنة.'
+   :'أدخلي بريد الحساب الذي أنشأتِه داخل Firebase Authentication وكلمة المرور الخاصة بهذا الحساب.';
  $('authBox').innerHTML=!enabled
-   ?'<p class="note">ملف Firebase غير جاهز.</p>'
-   :user?'<p class="note">الحساب التجريبي الوحيد متصل. لا تدخلي معلومات الطالبات الحقيقية.</p>'
-   :uid?'<div class="note"><p>رمز حساب Firebase (UID) — ليس كلمة مرور:</p><code id="firebaseUid">'+esc(uid)+'</code><div class="actions"><button type="button" class="secondary" id="copyUid">نسخ UID</button></div><p>أرسلي رمز UID فقط لاعتماد الحساب في التطبيق وقواعد البيانات.</p></div>'
-   :confirmLink?'<form id="completeEmailLinkForm" class="toolbar"><input name="email" type="email" autocomplete="email" required placeholder="البريد الذي استلم رابط الدخول"><button class="primary">تأكيد البريد والدخول</button></form>'
-   :'<form id="loginForm" class="toolbar"><input name="email" type="email" autocomplete="email" required placeholder="البريد الإلكتروني للموجّهة"><button class="primary">إرسال رابط دخول للبريد</button></form>';
+   ?'<p class="note">الإعدادات السحابية غير مكتملة.</p>'
+   :user?'<p class="note">المزامنة التجريبية مخصصة لحساب واحد فقط، وتعمل على الأجهزة الأربعة بعد اعتماد UID.</p>'
+   :uid?'<div class="note"><p>رمز المستخدم (UID) لاعتماد الحساب:</p><code id="firebaseUid">'+esc(uid)+'</code><div class="actions"><button type="button" class="secondary" id="copyUid">نسخ UID</button></div><p>انسخي UID فقط، ولا تشاركي كلمة المرور.</p></div>'
+   :'<form id="loginForm" class="toolbar"><input name="email" type="email" autocomplete="username" required placeholder="البريد الإلكتروني"><input name="password" type="password" autocomplete="current-password" required placeholder="كلمة مرور حساب التطبيق"><button type="submit" class="primary">تسجيل الدخول</button></form>';
  $('syncNow').disabled=!enabled||!user;
  $('signOut').disabled=!enabled||(!user&&!uid);
 }
@@ -121,22 +119,19 @@ async function syncCloud(){
  }finally{busy=false}
 }
 function setup(){document.body.addEventListener('click',handleClick);$('school').addEventListener('change',e=>{state.school=e.target.value;$('studentProfile').classList.add('hidden');render()});$('studentSearch').addEventListener('input',renderStudents);$('studentGrade').addEventListener('change',renderStudents);for(const id of ['recordSearch','recordType','recordStatus'])$(id).addEventListener('input',renderEntries);for(const id of ['legacySearch','legacyCategory'])$(id).addEventListener('input',renderLegacy);for(const id of ['fromDate','toDate','reportType','reportStatus','showNames'])$(id).addEventListener('change',renderReports);$('quickAdd').onclick=()=>openEditor('entries');$('addRecord').onclick=()=>openEditor('entries');$('addStudent').onclick=()=>openEditor('students');$('addTask').onclick=()=>openEditor('tasks');$('closeEditor').onclick=$('cancelEditor').onclick=()=>$('editor').close();$('editorForm').addEventListener('submit',saveEditor);$('exportJson').onclick=exportJson;$('importJson').onchange=e=>importJson(e.target.files[0]);$('previewReport').onclick=renderReports;$('printReport').onclick=()=>{$('printArea').innerHTML=reportHTML();window.print()};$('exportCsv').onclick=exportCSV;$('syncNow').onclick=syncCloud;$('signOut').onclick=async()=>{if((await all('queue')).length){notify('يجب مزامنة التعديلات المعلقة قبل تسجيل الخروج');return}await CloudClient.signOut();realtimeStarted=false;await refresh();navigate('settings');notify('تم تسجيل الخروج')};$('authBox').addEventListener('submit',async e=>{
- if(!['loginForm','completeEmailLinkForm'].includes(e.target.id))return;
+ if(e.target.id!=='loginForm')return;
  e.preventDefault();
- const form=new FormData(e.target),email=String(form.get('email')||'').trim();
- const button=e.target.querySelector('button[type="submit"],button');
+ const form=new FormData(e.target),button=e.target.querySelector('button[type="submit"]');
  if(button)button.disabled=true;
  try{
-   if(e.target.id==='loginForm'){
-     await CloudClient.sendEmailLink(email);
-     notify('تم إرسال رابط الدخول. افتحي بريدك واضغطي الرابط.');
-   }else{
-     await CloudClient.completeEmailLink(email);
-     await refresh();renderSyncInfo();
-     if(CloudClient.user())await syncCloud();
-   }
- }catch(error){notify('تعذر إكمال الدخول: '+error.message)}
- finally{if(button&&button.isConnected)button.disabled=false}
+   const result=await CloudClient.signIn(form.get('email'),form.get('password'));
+   await refresh();renderSyncInfo();
+   if(result.allowed)await syncCloud();
+   else notify('نجح الدخول. انسخي UID لاعتماد الحساب وتفعيل المزامنة.');
+ }catch(error){
+   const msg=String(error.code||'');
+   notify(msg==='auth/invalid-credential'?'بيانات الدخول غير صحيحة أو أن المستخدم غير منشأ في Firebase.':'تعذر تسجيل الدخول: '+error.message)
+ }finally{if(button&&button.isConnected)button.disabled=false}
 });$('authBox').addEventListener('click',async e=>{
  if(e.target.id!=='copyUid')return;
  const uid=CloudClient.bootstrapUid?.();
@@ -153,9 +148,6 @@ function setup(){document.body.addEventListener('click',handleClick);$('school')
        else {await refresh();void syncCloud()}
      });
      await CloudClient.ensureSession();
-     try{
-       await CloudClient.processIncomingEmailLink();
-     }catch(error){notify('تعذر فتح رابط البريد: '+error.message)}
    } else {await seedDemo();}
    await refresh();
    if(CloudClient.ready()&&!CloudClient.user())navigate('settings');
