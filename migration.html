@@ -1,23 +1,25 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#101c38"><title>ترحيل النسخة القديمة | الموجّهة الطلابية</title>
-<link rel="icon" href="./icons/favicon-48.png"><link rel="stylesheet" href="./styles.css">
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#101c38">
+<title>فحص بيانات النظام القديم | الموجّهة الطلابية</title><link rel="icon" href="./icons/favicon-48.png"><link rel="stylesheet" href="./styles.css">
 <style>
-.migrate{max-width:920px;margin:26px auto;padding:16px}.migrate .panel{padding:20px;margin-bottom:16px}.migrate h1{margin:0 0 10px}.migrate .warnbox{background:#fff4df;border:1px solid #dbaf62;padding:13px;border-radius:12px;line-height:1.9}.migrate .actions{gap:12px;flex-wrap:wrap}.migrate label{display:block;margin:10px 0}.migrate select,.migrate input[type=file]{max-width:100%;padding:12px}.migrate table{width:100%;border-collapse:collapse}.migrate td,.migrate th{padding:8px;text-align:right;border-bottom:1px solid #ddd}.migrate .statusline{white-space:pre-wrap;line-height:1.8}.migrate button{margin:6px}.migrate button:disabled{opacity:.5;cursor:not-allowed}
-</style></head><body><div class="migrate"><p><a href="./">العودة للتطبيق الجديد</a></p>
-<div class="panel"><h1>فحص وترحيل بيانات التطبيق القديم</h1>
-<p>هذه أداة مستقلة تقرأ البيانات للمعاينة في جهازك. لا تمسح بيانات التطبيق القديم، ولا تُرسلها تلقائيًا إلى أي خدمة أو إلى GitHub.</p>
-<div class="warnbox"><strong>الحماية أولًا:</strong> قبل النقل السحابي الفعلي يجب اعتماد الاستضافة والصلاحيات، والتأكد من النسخة الاحتياطية ومطابقة الأعداد. لا تستخدم ملفًا يحتوي أسماء طالبات على جهاز عام.</div></div>
-<div class="panel"><h2>١. مصدر البيانات القديمة</h2>
-<div class="actions"><button class="secondary" id="checkOld" type="button">فحص التخزين القديم على هذا الجهاز (قراءة فقط)</button>
-<label class="secondary upload">اختيار ملف JSON الاحتياطي<input type="file" accept=".json,application/json" id="backupFile" hidden></label></div>
-<p class="note">إذا لم تظهر بيانات في هذا المتصفح، استخدمي ملف «نسخة_احتياطية_نظام_الموجهة_...json» المُصدر من الجهاز الذي يحتوي السجلات. لا تعيدي استعادة أو تشغيل النسخة القديمة لمجرد الحصول على نسخة ما لم تتأكدي من سلامة البيانات.</p></div>
-<div class="panel"><h2>٢. تحديد المدرسة ومراجعة الأعداد</h2><label for="targetSchool">المدرسة التي تخصها هذه البيانات القديمة:</label>
-<select id="targetSchool"><option value="">يجب اختيار المدرسة صراحةً</option><option value="p31">الابتدائية ٣١</option><option value="m34">المتوسطة ٣٤</option></select>
-<p class="note">إذا كان ملف واحد يضم المدرستين دون حقل يميز السجل، لا تنفذي نقله إلى مدرسة واحدة. يجب فصل الملفات أو تدقيق الصفوف أولًا.</p>
-<p id="sourceInfo" class="statusline">لم تُحدَّد بيانات للفحص بعد.</p>
-<div id="countTable"></div></div>
-<div class="panel"><h2>٣. نقل السجلات بعد المطابقة</h2>
-<p>نحفظ جميع الحقول الأصلية لأقسام النسخة القديمة في أرشيف مستقل، بما فيها البرامج والفعاليات، مع ربط السجلات بأسماء الطالبات قدر الإمكان. لا يتم حذف أي سجل من المصدر.</p>
-<div class="actions"><button class="primary" type="button" id="transfer" disabled>نقل النسخة إلى قاعدة البيانات المعتمدة</button><button class="secondary" type="button" id="clearPreview">إغلاق المعاينة ومسحها من الذاكرة</button></div>
-<p id="cloudInfo" class="note"></p><p id="progress" class="statusline" role="status"></p></div>
-</div><script src="config.js"></script><script src="cloud.js"></script><script src="migration.js"></script></body></html>
+.migrate{max-width:1000px;margin:22px auto;padding:14px}.migrate .panel{padding:20px;margin-bottom:15px}.migrate h1{margin-top:0}.notice{background:#fff5e6;border:1px solid #d5ae70;border-radius:12px;padding:13px;line-height:1.9}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.note{line-height:1.9}.scroll-table{overflow:auto}.migrate table{border-collapse:collapse;width:100%;font-size:14px}.migrate th,.migrate td{padding:9px 8px;border-bottom:1px solid #ddd;text-align:right;vertical-align:middle}.migrate select{min-width:135px;max-width:100%;padding:7px}.migrate td small{display:block;color:#6b7280}.migrate button:disabled{opacity:.5;cursor:not-allowed}.statusbox{white-space:pre-wrap;line-height:1.9}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:14px 0}.summary-grid>div{border-radius:12px;border:1px solid #b9c4d7;padding:12px}.summary-grid b{font-size:23px;display:block}.warning-text{color:#8b4513}
+</style></head><body><div class="migrate">
+<p><a href="./">العودة إلى التطبيق الجديد</a></p>
+<div class="panel"><h1>فحص وترحيل النسخة القديمة</h1><p>تفحص هذه الصفحة بيانات المصدر محليًا دون تعديل الإصدار القديم أو إرسالها إلى GitHub.</p>
+<div class="notice"><b>سرية بيانات الطالبات:</b> تحتوي النسخة القديمة على معلومات صحية واجتماعية وأرقام أولياء أمور. لا تستخدمي إلا جهازًا موثوقًا. النقل السحابي محجوب حتى اعتماد الاستضافة والتأكد من هوية الموجّهة والصلاحيات والنسخ الاحتياطي.</div></div>
+<div class="panel"><h2>١. فتح النسخة القديمة للمعاينة</h2>
+<div class="actions"><button class="secondary" type="button" id="checkOld">فحص التخزين القديم في هذا المتصفح</button>
+<label class="secondary upload">اختيار ملف النسخة الاحتياطية JSON<input type="file" id="backupFile" accept=".json,application/json" hidden></label></div>
+<p class="note">يمكنك اختيار الملف الذي يبدأ باسمه «نسخة_احتياطية_نظام_الموجهة». لا تحتاجين إلى تعديل النسخة القديمة. إن كان تخزين الأيقونة المثبتة منفصلًا عن المتصفح، فاستعملي الملف الاحتياطي.</p>
+<div id="sourceInfo" class="statusbox">لم يتم اختيار مصدر للفحص.</div></div>
+<div class="panel"><h2>٢. توزيع السجلات على المدرستين</h2>
+<p>يحدد التطبيق المدرسة اعتمادًا على المرحلة الدراسية بقدر الإمكان، ثم يطلب منك مراجعة الحالات غير الواضحة. لا يُسند الملف كله إلى مدرسة واحدة.</p>
+<div id="schoolStats" class="summary-grid"></div><div class="scroll-table" id="countTable"></div></div>
+<div class="panel"><h2>٣. مراجعة السجلات التي لا يمكن تحديد مدرستها</h2>
+<p>اختاري المدرسة لكل سجل غير محسوم. تبقى السجلات بأسماء متعددة محفوظة كما هي؛ لن نفترض أنها اسم طالبة واحدة.</p><div id="reviewList" class="scroll-table"></div>
+<p class="note warning-text" id="qualityMessage"></p></div>
+<div class="panel"><h2>٤. الترحيل الآمن بعد الاعتماد</h2>
+<p>عند التفعيل، سيُحفظ الأصل بكل حقوله في جدول أرشيف محمي منفصل، مع ربط سجلات الطالبة كلما أمكن. لن يحذف أي شيء من الملف الأصلي.</p>
+<div class="actions"><button class="primary" type="button" id="transfer" disabled>بدء نقل السجلات إلى الاستضافة المعتمدة</button><button class="secondary" type="button" id="clearPreview">إغلاق المعاينة ومسحها من ذاكرة الصفحة</button></div>
+<p class="note" id="cloudInfo"></p><p class="statusbox" id="progress" role="status"></p></div>
+</div><script src="./config.js"></script><script src="./cloud.js"></script><script src="./migration.js"></script></body></html>
