@@ -33,11 +33,78 @@ function empty(t){return `<div class="empty">${esc(t)}</div>`}
 function studentCard(s){const count=live('entries').filter(e=>e.student_id===s.id).length;return card(esc(s.name),`${esc(s.grade)} • فصل ${esc(s.class_name)} • ${count} سجلات`,`<button data-profile="${s.id}">الملف</button><button data-edit="students:${s.id}">تعديل</button>`)}
 function renderStudents(){const school=live('students'),grades=[...new Set(school.map(x=>x.grade))].sort();const old=$('studentGrade').value;$('studentGrade').innerHTML='<option value="">كل الصفوف</option>'+grades.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join('');$('studentGrade').value=grades.includes(old)?old:'';const term=$('studentSearch').value.trim().toLowerCase(),grade=$('studentGrade').value;const filtered=school.filter(x=>(!grade||x.grade===grade)&&(`${x.name} ${x.grade} ${x.class_name}`.toLowerCase().includes(term)));$('studentList').innerHTML=filtered.map(studentCard).join('')||empty('لا توجد طالبات مطابقة')}
 function showProfile(id){const s=state.students.find(x=>x.id===id);if(!s)return;const records=live('entries').filter(x=>x.student_id===id).sort((a,b)=>b.date.localeCompare(a.date));$('studentProfile').classList.remove('hidden');$('studentProfile').innerHTML=`<h2>الملف الموحّد: ${esc(s.name)}</h2><p>${schoolName(s.school_code)} • ${esc(s.grade)} • الفصل ${esc(s.class_name)}</p><div class="actions"><button class="secondary" data-edit="students:${s.id}">تعديل البيانات</button><button class="primary" data-newrecord="${s.id}">إضافة متابعة</button><button class="secondary" data-closeprofile="1">إغلاق الملف</button></div>${records.map(entryCard).join('')||empty('لا توجد سجلات للطالبة')}`}
-function entryCard(e){const name=e.student_name||byId(e.student_id);return card(esc(e.type),`${esc(e.date)} • ${esc(name)} • <span class="pill ${e.status==='مفتوحة'?'open':'done'}">${esc(e.status)}</span><div>${esc(e.notes||'')}</div>`, `<button data-edit="entries:${e.id}">تعديل</button><button data-toggleentry="${e.id}">${e.status==='مفتوحة'?'إغلاق':'إعادة فتح'}</button>`)}
+function entryCard(e){const name=e.student_name||byId(e.student_id);return card(esc(e.type),`${esc(e.date)} • ${esc(name)} • <span class="pill ${e.status==='مفتوحة'?'open':e.status==='مغلقة'?'done':''}">${esc(statusFor(e))}</span><div><b>الموضوع:</b> ${esc(subjectFor(e))}</div><div><b>الإجراء:</b> ${esc(actionFor(e)||'لم يُدوّن إجراء')}</div>`, `<button data-edit="entries:${e.id}">تعديل</button><button data-toggleentry="${e.id}">${e.status==='مفتوحة'?'إغلاق':e.status==='مغلقة'?'إعادة فتح':'تحديد حالة المتابعة'}</button>`)}
 function renderEntries(){const term=$('recordSearch').value.toLowerCase(),type=$('recordType').value,status=$('recordStatus').value;const entries=live('entries').filter(x=>(!type||x.type===type)&&(!status||x.status===status)&&(`${x.notes} ${x.action_note} ${x.type} ${x.student_name||byId(x.student_id)}`.toLowerCase().includes(term))).sort((a,b)=>b.updated_at.localeCompare(a.updated_at));$('recordList').innerHTML=entries.map(entryCard).join('')||empty('لا توجد نتائج')}
 function renderTasks(){const tasks=live('tasks').slice().sort((a,b)=>(a.done-b.done)||a.due_date.localeCompare(b.due_date));$('taskList').innerHTML=tasks.map(t=>card(esc(t.title),`${esc(t.due_date)} • <span class="pill ${t.done?'done':'open'}">${t.done?'منتهية':'قيد التنفيذ'}</span>`,`<button data-toggletask="${t.id}">${t.done?'إعادة فتح':'إنجاز'}</button><button data-edit="tasks:${t.id}">تعديل</button>`)).join('')||empty('لا توجد مهام')}
-function reportData(){const from=$('fromDate').value,to=$('toDate').value,type=$('reportType').value,status=$('reportStatus').value;return live('entries').filter(x=>(!from||x.date>=from)&&(!to||x.date<=to)&&(!type||x.type===type)&&(!status||x.status===status)).sort((a,b)=>a.date.localeCompare(b.date))}
-function reportHTML(){const entries=reportData(),showNames=$('showNames').checked;const groups=types.map(t=>[t,entries.filter(e=>e.type===t).length]).filter(x=>x[1]);const max=Math.max(...groups.map(x=>x[1]),1);return `<article class="report-sheet"><header><div>وزارة التعليم — تقرير تجريبي غير رسمي</div><h2>${schoolName(state.school)}</h2><div>تقرير الموجّهة الطلابية • ${esc(today())}</div></header><p><b>عدد السجلات:</b> ${entries.length} • <b>متابعات مفتوحة:</b> ${entries.filter(x=>x.status==='مفتوحة').length}</p><div class="barchart">${groups.map(([name,count])=>`<div class="barrow"><b>${esc(name)}</b><span class="bar" style="width:${Math.round(count/max*60)}%"></span><small>${count}</small></div>`).join('')}</div><table><thead><tr><th>م</th><th>التاريخ</th><th>نوع السجل</th>${showNames?'<th>اسم الطالبة</th>':''}<th>الحالة</th></tr></thead><tbody>${entries.map((e,i)=>`<tr><td>${i+1}</td><td>${esc(e.date)}</td><td>${esc(e.type)}</td>${showNames?`<td>${esc(e.student_name||byId(e.student_id))}</td>`:''}<td>${esc(e.status)}</td></tr>`).join('')||`<tr><td colspan="${showNames?5:4}">لا توجد بيانات</td></tr>`}</tbody></table><footer><div>الموجّهة الطلابية: ____________</div><div>التوقيع: ____________</div></footer></article>`}
+function reportData(){
+ const from=$('fromDate').value,to=$('toDate').value,type=$('reportType').value,status=$('reportStatus').value;
+ return live('entries').filter(x=>(!from||x.date>=from)&&(!to||x.date<=to)&&(!type||x.type===type)&&(!status||x.status===status)).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')))
+}
+// Imported records are immutable in legacy_records. Existing Firestore entries
+// are enhanced for printing without a second import or overwriting student data.
+function originalFor(e){return e.source_legacy_id
+ ? state.legacy_records.find(x=>x.id===e.source_legacy_id):null}
+function subjectFor(e){
+ if(String(e.subject||'').trim())return String(e.subject).trim();
+ const legacy=originalFor(e);
+ if(legacy){
+   const r=legacy.raw_data||{};
+   return [r.type,r.reason].filter(x=>String(x||'').trim()).map(String).join(' — ') || 'لم يُسجّل موضوع الحالة';
+ }
+ return String(e.notes||'').trim()||'لم يُسجّل موضوع الحالة';
+}
+function detailsFor(e){
+ const legacy=originalFor(e);
+ if(legacy){
+  const r=legacy.raw_data||{};
+  const pieces=[];
+  // 'notes' in daily legacy records commonly describe an action rather than
+  // symptoms; display in action column with attribution, not twice here.
+  if(legacy.category!=='daily'&&r.notes)pieces.push(String(r.notes));
+  if(r.lives)pieces.push('الإقامة: '+r.lives);
+  if(r.level)pieces.push('درجة الأهمية: '+r.level);
+  if(r.follow)pieces.push('تحتاج متابعة: '+r.follow);
+  return pieces.join(' — ');
+ }
+ return String(e.notes||'').trim();
+}
+function actionFor(e){
+ if(e.action_taken!==undefined)return String(e.action_taken||'').trim();
+ const legacy=originalFor(e);
+ if(legacy){
+  const r=legacy.raw_data||{};
+  if(legacy.category==='guardians'&&r.result)return String(r.result);
+  if(legacy.category==='material'&&r.status)return 'النتيجة المدونة: '+r.status;
+  if(legacy.category==='daily'&&r.notes)return 'ورد في ملاحظات السجل القديم: '+r.notes;
+  return '';
+ }
+ return String(e.action_note||'').trim();
+}
+function statusFor(e){
+ return e.status==='مفتوحة'||e.status==='مغلقة'?e.status:'لم تُوثّق حالة المتابعة';
+}
+function reportHTML(){
+ const entries=reportData(),showNames=$('showNames').checked;
+ const groups=types.map(t=>[t,entries.filter(e=>e.type===t).length]).filter(x=>x[1]);
+ const max=Math.max(...groups.map(x=>x[1]),1);
+ const unknown=entries.filter(e=>!['مفتوحة','مغلقة'].includes(e.status)).length;
+ const head='<th>م</th><th>التاريخ</th><th>القسم</th>'+(showNames?'<th>اسم الطالبة</th>':'')+
+   '<th>موضوع الحالة</th><th>التفاصيل والملاحظات</th><th>الإجراء المتخذ أو الموثق</th><th>حالة المتابعة</th>';
+ const contents=entries.map((e,i)=>'<tr><td>'+(i+1)+'</td><td>'+esc(e.date||'—')+'</td><td>'+esc(e.type)+
+   '</td>'+(showNames?'<td>'+esc(e.student_name||byId(e.student_id))+'</td>':'')+
+   '<td>'+esc(subjectFor(e))+'</td><td>'+esc(detailsFor(e)||'—')+
+   '</td><td>'+esc(actionFor(e)||'لم يُدوّن إجراء')+'</td><td>'+esc(statusFor(e))+'</td></tr>').join('');
+ return '<article class="report-sheet"><header><div>وزارة التعليم — سجل إرشادي (للاستخدام المصرح به)</div><h2>'+schoolName(state.school)+
+   '</h2><div>تقرير الموجّهة الطلابية • '+esc(today())+'</div></header><p><b>إجمالي السجلات:</b> '+entries.length+
+   ' • <b>متابعات مفتوحة:</b> '+entries.filter(x=>x.status==='مفتوحة').length+
+   ' • <b>متابعات مغلقة:</b> '+entries.filter(x=>x.status==='مغلقة').length+
+   ' • <b>لم تُوثّق حالة المتابعة:</b> '+unknown+'</p>'+
+   (unknown?'<p class="report-note">السجلات القديمة التي لم تُذكر فيها حالة المتابعة لا يمكن اعتبارها مفتوحة أو مغلقة تلقائيًا؛ راجعيها وحددي حالتها من صفحة السجلات.</p>':'')+
+   '<div class="barchart">'+groups.map(([name,count])=>'<div class="barrow"><b>'+esc(name)+'</b><span class="bar" style="width:'+Math.round(count/max*60)+'%"></span><small>'+count+'</small></div>').join('')+
+   '</div><div class="report-table-scroll"><table><thead><tr>'+head+'</tr></thead><tbody>'+(
+   contents||'<tr><td colspan="'+(showNames?8:7)+'">لا توجد سجلات مطابقة</td></tr>')+
+   '</tbody></table></div><footer><div>الموجّهة الطلابية: ____________</div><div>التوقيع: ____________</div></footer></article>';
+}
 function renderReports(){$('reportPreview').innerHTML=reportHTML()}
 const legacyLabels={daily:'المواقف اليومية الطارئة',attendance:'الغياب والمواظبة',behavior:'المخالفات والسلوك',health:'الحالات الصحية',social:'الحالات الاجتماعية',material:'الحالات المادية',events:'البرامج والفعاليات',guardians:'أولياء الأمور',followup:'المحتاجات للمتابعة',honor:'تكريم الطالبات',academic:'التحصيل الدراسي'};
 function renderLegacy(){
@@ -77,7 +144,7 @@ function select(name,title,values,val='',required=false){return `<div class="fie
 function textarea(name,title,val=''){return `<div class="field wide"><label for="f_${name}">${title}</label><textarea id="f_${name}" name="${name}">${esc(val)}</textarea></div>`}
 function openEditor(kind,id=null,student=null){if(CloudClient.ready()&&!CloudClient.user()){notify('سجلي الدخول إلى Firebase قبل إضافة البيانات');navigate('settings');return}formContext={kind,id};const old=id?state[kind].find(x=>x.id===id):{};$('editorTitle').textContent=({students:'بيانات الطالبة',entries:'تسجيل موقف أو حالة',tasks:'مهمة أسبوعية'})[kind];let fields='';if(kind==='students')fields=input('name','اسم الطالبة',old.name,true)+input('grade','الصف',old.grade,true)+input('class_name','الفصل',old.class_name,true);if(kind==='entries'){const students=live('students');if(!students.length){notify('أضيفي طالبة أولًا');navigate('students');return}fields=select('student_id','الطالبة',students.map(s=>[s.id,`${s.name} • ${s.grade}`]),student||old.student_id,true)+select('type','نوع السجل',types.map(t=>[t,t]),old.type||types[0])+input('date','التاريخ',old.date||today(),true,'date')+select('status','حالة المتابعة',[['مفتوحة','مفتوحة'],['مغلقة','مغلقة']],old.status||'مفتوحة')+textarea('notes','تفاصيل الحالة',old.notes)+textarea('action_note','الإجراء / التواصل',old.action_note)}if(kind==='tasks')fields=input('title','عنوان المهمة',old.title,true)+input('due_date','موعد المتابعة',old.due_date||today(),true,'date')+select('done','حالة المهمة',[['false','قيد التنفيذ'],['true','منتهية']],String(Boolean(old.done)));$('formFields').innerHTML=`<div class="fields-grid">${fields}</div>`;$('editor').showModal()}
 async function saveEditor(e){e.preventDefault();const {kind,id}=formContext;const old=id?state[kind].find(x=>x.id===id):null;const form=new FormData($('editorForm'));const value={...old,id:id||uuid(),school_code:state.school,updated_at:stamp(),is_deleted:false};for(const [k,v] of form.entries())value[k]=String(v).trim();if(kind==='tasks')value.done=value.done==='true';if(kind==='students'&&!value.name.trim()){notify('اسم الطالبة مطلوب');return}await save(kind,value);$('editor').close();notify('تم حفظ التغيير في النسخة التجريبية')}
-async function handleClick(e){const b=e.target.closest('button');if(!b)return;if(b.dataset.page)navigate(b.dataset.page);if(b.dataset.type!==undefined){$('recordType').value=types[Number(b.dataset.type)];navigate('records')}if(b.dataset.profile)showProfile(b.dataset.profile);if(b.dataset.closeprofile)$('studentProfile').classList.add('hidden');if(b.dataset.newrecord)openEditor('entries',null,b.dataset.newrecord);if(b.dataset.edit){const [kind,id]=b.dataset.edit.split(':');openEditor(kind,id)}if(b.dataset.toggleentry){const x=state.entries.find(v=>v.id===b.dataset.toggleentry);if(x)await save('entries',{...x,status:x.status==='مفتوحة'?'مغلقة':'مفتوحة'})}if(b.dataset.toggletask){const x=state.tasks.find(v=>v.id===b.dataset.toggletask);if(x)await save('tasks',{...x,done:!x.done})}}
+async function handleClick(e){const b=e.target.closest('button');if(!b)return;if(b.dataset.page)navigate(b.dataset.page);if(b.dataset.type!==undefined){$('recordType').value=types[Number(b.dataset.type)];navigate('records')}if(b.dataset.profile)showProfile(b.dataset.profile);if(b.dataset.closeprofile)$('studentProfile').classList.add('hidden');if(b.dataset.newrecord)openEditor('entries',null,b.dataset.newrecord);if(b.dataset.edit){const [kind,id]=b.dataset.edit.split(':');openEditor(kind,id)}if(b.dataset.toggleentry){const x=state.entries.find(v=>v.id===b.dataset.toggleentry);if(x&&['مفتوحة','مغلقة'].includes(x.status))await save('entries',{...x,status:x.status==='مفتوحة'?'مغلقة':'مفتوحة'});else if(x)openEditor('entries',x.id)}if(b.dataset.toggletask){const x=state.tasks.find(v=>v.id===b.dataset.toggletask);if(x)await save('tasks',{...x,done:!x.done})}}
 async function exportJson(){const snapshot={schema:'guidance-v2-demo-1',exported_at:stamp(),warning:'بيانات تجريبية فقط',students:state.students,entries:state.entries,tasks:state.tasks};download('student-guidance-demo-'+today()+'.json',JSON.stringify(snapshot,null,2),'application/json');notify('تم تنزيل النسخة التجريبية')}
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000)}
 async function importJson(file){if(!file)return;let data;try{data=JSON.parse(await file.text());if(data.schema!=='guidance-v2-demo-1'||!tables.every(t=>Array.isArray(data[t])))throw new Error('نسخة غير مطابقة');if(!confirm('سيتم دمج بيانات نسخة تجريبية فقط. هل تريد المتابعة؟'))return;for(const t of tables)for(const r of data[t]){if(!r.id||!['p31','m34'].includes(r.school_code))throw Error('بنية غير صالحة');await put(t,r)}await refresh();notify('اكتمل استيراد البيانات التجريبية')}catch(err){notify('تعذر الاستيراد: '+err.message)}}
