@@ -322,7 +322,10 @@ async function removeStudentSafely(id){
    const preview=await CloudClient.previewStudentDeletion(id,state.school);
    const {counts,docs}=preview;
    const pending=await all('queue');
-   if(pending.some(j=>docs.some(d=>d.table===j.table&&d.id===j.entity?.id))){
+   const linkedRemoteIds=new Set(docs.filter(d=>d.table==='entries').map(d=>d.id));
+   const hasLocalOnly=state.entries.some(e=>e.student_id===id&&!e.is_deleted&&!linkedRemoteIds.has(e.id));
+   if(hasLocalOnly||pending.some(j=>j.entity?.student_id===id||
+        docs.some(d=>d.table===j.table&&d.id===j.entity?.id))){
      alert('توجد تعديلات غير متزامنة تخص هذه الطالبة أو سجلاتها. نفّذي «مزامنة الآن» أولًا، ثم أعيدي محاولة الحذف. لم يُحذف شيء.');
      return;
    }
