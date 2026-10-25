@@ -115,22 +115,50 @@
       listeners.push(unsub);
     }
   }
-  async function insertManyIfMissing(table,rows,batchSize=20,onProgress=()=>{}) {
-    if(config.allowLegacyImport!==true || config.mode!=='approved')throw Error('استيراد سجلات حقيقية غير مفعّل قبل موافقة الجهة.');
+  // Owner-confirmed, create-only import. Never overwrites existing records.
+  // The caller must pass explicit user attestation and a known valid session;
+  // data is transmitted only after the person presses Import.
+  async function insertManyIfMissing(table, rows, batchSize=20, onProgress=()=>{}, opts={}) {
+    if(!['students','entries','legacy_records'].includes(table))
+      throw Error('هذه الفئة غير مسموح باستيرادها.');
+    if(opts?.userConfirmed!==true)
+      throw Error('لا يمكن البدء دون إقرار المستخدم الصريح بصلاحية نقل البيانات.');
     const {c,s}=await collectionFor(table);
-    for(let i=0;i<rows.length;i+=batchSize){
-      for(const row of rows.slice(i,i+batchSize)){
+    if(!Array.isArray(rows)||rows.length>10000)throw Error('قائمة السجلات غير صالحة.');
+    let inserted=0,existing=0;
+    for(let i=0;i<rows.length;i+=Math.max(1,Math.min(20,batchSize))){
+      const batch=rows.slice(i,i+Math.max(1,Math.min(20,batchSize)));
+      for(const row of batch){
+        if(row.owner_id!==s.user.id||!row.id||
+           !['p31','m34'].includes(row.school_code) ||
+           row.revision!==1)throw Error('بيانات أحد السجلات غير صالحة أو غير مصرح بها.');
         const ref=c.storeLib.doc(c.db,'users',s.user.id,table,String(row.id));
-        await c.storeLib.runTransaction(c.db,async tx=>{const old=await tx.get(ref);if(!old.exists())tx.set(ref,{...row,owner_id:s.user.id,revision:1})});
+        const result=await c.storeLib.runTransaction(c.db,async tx=>{
+          const before=await tx.get(ref);
+          if(before.exists()){
+            const data=before.data();
+            if(data.owner_id!==row.owner_id || data.school_code!==row.school_code)
+              throw Error('تعارض معرف موجود في قاعدة البيانات: '+row.id);
+            if(table==='legacy_records' && data.source_id!==row.source_id)
+              throw Error('سجل أصلي مختلف يستعمل المعرّف نفسه.');
+            if(table==='entries' && data.source_legacy_id!==row.source_legacy_id)
+              throw Error('سجل جديد مختلف يستعمل المعرّف نفسه.');
+            return false;
+          }
+          tx.set(ref,row);
+          return true;
+        });
+        if(result)inserted++;else existing++;
       }
-      onProgress(Math.min(i+batchSize,rows.length));
+      onProgress(Math.min(i+batch.length,rows.length),{inserted,existing});
     }
+    return {inserted,existing,total:rows.length};
   }
   window.CloudClient={
     ready:enabled,
     user:()=>authUser,
     setAuthObserver:callback=>{notifyAuth=callback;},
     ensureSession,signIn,bootstrapUid,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,
-    allowLegacyImport:()=>config.mode==='approved'&&config.allowLegacyImport===true
+    allowLegacyImport:()=>Boolean(config.allowedUid && config.mode==='demo')
   };
 })();
