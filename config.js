@@ -1,15 +1,14 @@
-// Firebase TEST connection: no credentials are configured or uploaded here.
-// Register a Web app in Firebase console (Spark plan), create ONE test user,
-// deploy reviewed firestore.rules, then enter the PUBLIC config values below.
-// Firebase apiKey is a public project identifier, NOT a service-account secret.
-// Do not deploy real school/student data until the competent authority approves.
-// NEVER put service account credentials, passwords, JSON backups or student names in GitHub.
+// Firebase Web app public configuration; no password or service account credentials.
+// Safety gate: allowlisted Firebase Auth UID must be entered separately after creating
+// a dedicated TEST account; actual student backup import is disabled.
+// Firebase config identifiers are public, but Firestore access requires signed-in
+// users and restrictive firestore.rules deployed in the Firebase project.
 window.GUIDANCE_FIREBASE = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  appId: '',
-  allowedUid: '', // Firebase Authentication -> Users -> UID of wife's test account
-  mode: 'demo',    // stays demo: real legacy import is always DISABLED
+  apiKey: 'AIzaSyCIbJIRQP8XiWQ9WT6XXPekL-80XyLMrrM',
+  authDomain: 'student-guidance2.firebaseapp.com',
+  projectId: 'student-guidance2',
+  appId: '1:11471604599:web:3fddf6f8a543fb772d6f72',
+  allowedUid: '', // Set only after account created and verified in Firebase Auth.
+  mode: 'demo',
   allowLegacyImport: false
 };
