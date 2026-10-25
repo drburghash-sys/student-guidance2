@@ -8,7 +8,7 @@ window.GUIDANCE_FIREBASE = {
   authDomain: 'student-guidance2.firebaseapp.com',
   projectId: 'student-guidance2',
   appId: '1:11471604599:web:3fddf6f8a543fb772d6f72',
-  allowedUid: '', // Set after creating the test user in Firebase Authentication (UID only).
+  allowedUid: 'rcQFXYxMeDRAUFOfKscAd4H2LWf1', // The only approved test user — Firebase Auth UID.
   mode: 'demo',
   allowLegacyImport: false
 };
