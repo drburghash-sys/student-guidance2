@@ -2,7 +2,10 @@
 (function(){
 const cfg=window.GUIDANCE_CLOUD||{},key='sgv2_cloud_session';
 let session=null;try{session=JSON.parse(localStorage.getItem(key)||'null')}catch{}
-const ready=()=>Boolean(cfg.url&&cfg.anonKey);
+// GitHub Pages owner.github.io repositories share one web origin. Do not expose
+// student data or reusable auth sessions alongside unrelated apps on that origin.
+const isolatedOrigin=()=>typeof location!=='undefined' && location.protocol==='https:' && !/\\.github\\.io$/i.test(location.hostname);
+const ready=()=>Boolean(cfg.url&&cfg.anonKey&&isolatedOrigin());
 async function request(path,method='GET',body=null,token=null,extra={}){
  if(!ready())throw new Error('المزامنة السحابية غير مهيأة');
  const headers={apikey:cfg.anonKey,'Content-Type':'application/json',...extra};if(token)headers.Authorization='Bearer '+token;
