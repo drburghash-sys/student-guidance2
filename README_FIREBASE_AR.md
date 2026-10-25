@@ -1,7 +1,7 @@
 # إعداد تسجيل الدخول بكلمة المرور — Firebase / الموجّهة الطلابية
 **التاريخ:** ٢٥ أكتوبر ٢٠٢٦  
 **المشروع:** `student-guidance2` — مستخدمة واحدة على أربعة أجهزة.  
-**الحالة:** جرى تحديث الكود في GitHub ليستخدم **Email/Password** بدل رابط البريد. ربط UID ونشر قواعد Firestore واختبار المزامنة على Firebase لم تكتمل بعد.
+**الحالة:** جرى تحديث الكود في GitHub ليستخدم **Email/Password**، وتم اعتماد UID الخاص بالمستخدمة في `config.js` و`firestore.rules`. **نشر قواعد Firestore داخل Firebase واختبار المزامنة المباشرة لم يكتمل بعد.**
 
 > وضع تجريبي ببيانات وهمية فقط. يمنع إدخال أو رفع بيانات الطالبات الحقيقية أو استيراد النسخة السابقة حتى موافقة الجهة المسؤولة ومراجعة حماية البيانات والنسخ الاحتياطية.
 
@@ -11,19 +11,19 @@
 2. من **Authentication → Sign-in method**، ضمن **Email/Password** فعّل الخيار الأول **Email/Password** ثم احفظ. يمكنك إيقاف خيار **Email link (passwordless sign-in)** إن لم تعد تريده.
 3. افتح **Authentication → Users** واختر **Add user**.
 4. أدخل البريد الإلكتروني لزوجتك، واختر **كلمة مرور جديدة خاصة بحساب التطبيق**، ثم احفظ. **لا تستخدم كلمة مرور Gmail نفسها، ولا ترسلها عبر ChatGPT أو GitHub.** كلمة المرور هنا لحساب Firebase Authentication، وليست كلمة مرور Google.
-5. في جدول **Users** يظهر عمود **UID**. انسخ UID لهذا الحساب فقط. إذا لم يظهر كاملًا، افتح تفاصيل المستخدم.
+5. **مكتمل:** تم استخراج UID للمستخدمة الواحدة وإضافته بالفعل في `config.js` و`firestore.rules`. لا تحتاج إلى إنشاء مستخدم جديد.
 6. افتح التطبيق من متصفح Chrome عبر: https://drburghash-sys.github.io/student-guidance2/?v=20261025-password-1
 7. من **الإعدادات** أدخل البريد وكلمة مرور حساب التطبيق اللذين أنشأتهما. عند نجاح تسجيل الدخول، سيظهر UID مؤقتًا في التطبيق لأن `allowedUid` لم يُعتمد بعد.
-8. أرسل **UID فقط** للمساعدة في تثبيته داخل `config.js` و`firestore.rules` (لا ترسل كلمة المرور أو رمز التحقق).
-9. من **Build → Firestore Database** أنشئ قاعدة **Standard** بوضع **Production mode** (لا تستخدم Test mode)، وانشر `firestore.rules` بعد استبدال `REPLACE_WITH_TEST_UID` بالـ UID المعتمد.
+8. **مكتمل:** حساب المستخدمة الواحدة مثبت في ملفات المشروع، ولا تطلب مشاركة كلمة المرور أو رمز التحقق.
+9. من **Build → Firestore Database** أنشئ قاعدة **Standard** بوضع **Production mode** (لا تستخدم Test mode) إن لم تكن موجودة. افتح **Rules** والصق كامل محتوى [firestore.rules](firestore.rules) الذي يتضمن UID المسموح مسبقًا، ثم اضغط **Publish**. لا تنشر قاعدة مفتوحة مثل `allow read, write: if true;`.
 10. نختبر المزامنة بين الأجهزة الأربعة بسجلات وهمية فقط، ثم إعداد النسخ الاحتياطية ومراجعة جاهزية التشغيل الحقيقي.
 
 ## حالة الكود
 
 - `firebase-sync.js`: `signInWithEmailAndPassword` مع التحقق من `allowedUid`.
 - `app.js`: نموذج بريد + كلمة مرور؛ عرض UID فقط بعد أول دخول للمستخدم غير المعتمد.
-- `config.js`: إعدادات Firebase Web العامة مضبوطة؛ UID ما زال فارغًا عمدًا؛ `mode:'demo'` و `allowLegacyImport:false`.
-- `firestore.rules`: يمنع الوصول إلى أي مجموعة حتى تثبيت UID ونشر القواعد يدويًا؛ لا يعتمد الأمن على `allowedUid` في المتصفح وحده.
+- `config.js`: إعدادات Firebase Web العامة مضبوطة؛ UID الخاص بالمستخدمة محدد؛ `mode:'demo'` و `allowLegacyImport:false`، فلا استيراد للنسخة القديمة.
+- `firestore.rules`: UID موجود في القواعد الآن، لكن لن تصبح نافذة حتى نشرها في **Firebase Console → Firestore Database → Rules**؛ لا يعتمد الأمن على `allowedUid` في المتصفح وحده.
 - `migration.js`: استيراد بيانات الطالبات الحقيقية معطل.
 
 ## ملاحظات الأمان
