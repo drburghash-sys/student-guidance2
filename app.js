@@ -1,7 +1,7 @@
 'use strict';
 const types=['المواقف اليومية الطارئة','الغياب والمواظبة','المخالفات والسلوك','الحالات الصحية','الحالات الاجتماعية','الحالات المادية','البرامج والفعاليات','التواصل مع أولياء الأمور','الطالبات المحتاجات للمتابعة','تكريم الطالبات','التحصيل الدراسي'];
 const icons=['◈','◷','⚑','✚','♡','◇','✦','✉','◎','★','▥'];
-const dbName='guidance-v2-demo-2026',tables=['students','entries','tasks','legacy_records'];let db,state={students:[],entries:[],tasks:[],school:'p31',page:'home'},formContext={kind:null,id:null};let busy=false;
+const fbcfg=window.GUIDANCE_FIREBASE||{},dbName=CloudClient.ready()?'guidance-firebase-demo-'+fbcfg.projectId+'-'+fbcfg.allowedUid:'guidance-v2-demo-2026',tables=['students','entries','tasks','legacy_records'];let db,state={students:[],entries:[],tasks:[],legacy_records:[],school:'p31',page:'home'},formContext={kind:null,id:null};let busy=false,realtimeStarted=false;
 const $=x=>document.getElementById(x),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const stamp=()=>new Date().toISOString(),today=()=>new Date().toLocaleDateString('en-CA'),uuid=()=>crypto.randomUUID(),schoolName=s=>s==='p31'?'الابتدائية ٣١':'المتوسطة ٣٤';
 function notify(t){$('toast').textContent=t;$('toast').style.display='block';clearTimeout(window.toastTimer);window.toastTimer=setTimeout(()=>$('toast').style.display='none',3300)}
@@ -11,12 +11,18 @@ function all(name){return new Promise((ok,no)=>{const q=tx(name).getAll();q.onsu
 function get(name,id){return new Promise((ok,no)=>{const q=tx(name).get(id);q.onsuccess=()=>ok(q.result);q.onerror=()=>no(q.error)})}
 function put(name,v){return new Promise((ok,no)=>{const q=tx(name,'readwrite').put(v);q.onsuccess=()=>ok(v);q.onerror=()=>no(q.error)})}
 function remove(name,id){return new Promise((ok,no)=>{const q=tx(name,'readwrite').delete(id);q.onsuccess=()=>ok();q.onerror=()=>no(q.error)})}
-async function refresh(){for(const t of tables)state[t]=await all(t);render()}
+async function refresh(){
+ if(CloudClient.ready()&&!CloudClient.user()){for(const t of tables)state[t]=[];render();return}
+ for(const t of tables)state[t]=await all(t);
+ render();
+}
 async function save(table,entity,queue=true){
- if(CloudClient.ready()&&!CloudClient.user())throw new Error('يجب تسجيل الدخول قبل حفظ بيانات متزامنة');
- entity.updated_at=stamp();await put(table,entity);
- if(queue&&CloudClient.ready())await put('queue',{id:uuid(),table,entity,created_at:stamp()});
+ if(CloudClient.ready()&&!CloudClient.user())throw new Error('يجب تسجيل الدخول قبل الحفظ');
+ entity.updated_at=stamp();
+ await put(table,entity);
+ if(queue&&CloudClient.ready())await put('queue',{id:uuid(),table,entity:{...entity},created_at:stamp()});
  await refresh();
+ if(CloudClient.ready()&&navigator.onLine)void syncCloud();
 }
 async function seedDemo(){if(CloudClient.ready()||(await get('meta','seed'))?.yes)return;const a={id:uuid(),school_code:'p31',name:'طالبة تجريبية أ',grade:'الخامس',class_name:'١',updated_at:stamp(),is_deleted:false};const b={id:uuid(),school_code:'m34',name:'طالبة تجريبية ب',grade:'الثالث متوسط',class_name:'٢',updated_at:stamp(),is_deleted:false};await put('students',a);await put('students',b);await put('entries',{id:uuid(),school_code:'p31',student_id:a.id,type:types[0],date:today(),status:'مفتوحة',notes:'موقف وهمي لغرض التجربة فقط',action_note:'تجربة آلية المتابعة',updated_at:stamp(),is_deleted:false});await put('tasks',{id:uuid(),school_code:'p31',title:'مراجعة واجهة النسخة التجريبية',due_date:today(),done:false,updated_at:stamp(),is_deleted:false});await put('meta',{id:'seed',yes:true})}
 const live=table=>state[table].filter(x=>!x.is_deleted&&x.school_code===state.school);const byId=id=>state.students.find(s=>s.id===id)?.name||'غير مسجلة';
@@ -46,7 +52,22 @@ box.innerHTML=selected.slice(0,300).map(r=>'<details class="panel"><summary><b>'
 if(selected.length>300)box.innerHTML+='<p>يظهر أول ٣٠٠ سجل؛ استخدمي البحث لتضييق النتائج.</p>';
 }
 
-function renderSyncInfo(){const enabled=CloudClient.ready(),user=CloudClient.user();const s=$('syncStatus');s.textContent=!enabled?'تجربة محلية':user?'متصل بالسحابة':'غير مسجل';s.className='status '+(user?'online':enabled?'warn':'');$('cloudMessage').textContent=!enabled?'لم تُضبط الاستضافة السحابية بعد. هذه نسخة للمعاينة ببيانات وهمية وليست مناسبة لبيانات طالبات حقيقية.':user?`جلسة المزامنة: ${user.email||'حساب مصرح'}. التغييرات المؤجلة تُرسل عند توفر الاتصال.`:'جاهز للربط بالسحابة، يرجى تسجيل الدخول';$('authBox').innerHTML=enabled&&!user?'<form id="loginForm" class="toolbar"><input name="email" type="email" autocomplete="username" required placeholder="البريد المصرح به"><input name="password" type="password" autocomplete="current-password" required placeholder="كلمة المرور"><button class="primary">دخول</button></form>':enabled?'<p class="note">يستخدم النظام حسابًا فرديًا محددًا في قاعدة البيانات؛ لا توجد حسابات أخرى في النسخة التجريبية.</p>':'<p class="note">التفعيل السحابي ينتظر مراجعة حماية البيانات والموافقة على مزود الاستضافة، ولا يحتاج إعادة بناء الواجهة.</p>';$('syncNow').disabled=!enabled;$('signOut').disabled=!enabled||!user}
+function renderSyncInfo(){
+ const enabled=CloudClient.ready(),user=CloudClient.user(),s=$('syncStatus');
+ s.textContent=!enabled?'Firebase غير مربوط':user?'Firebase • حساب تجريبي':'Firebase • يلزم الدخول';
+ s.className='status '+(user?'online':enabled?'warn':'');
+ $('cloudMessage').textContent=!enabled
+   ?'تم تجهيز كود Firebase، ولم نربط مشروعًا بعد. التجربة ببيانات وهمية فقط، ولا تُرفع سجلات الطالبات الحقيقية.'
+   :user?'الحساب التجريبي: '+(user.email||'مستخدم مصرح')+' — مزامنة لحظية مع مراجعة تعارض التعديلات. لا تدخلي بيانات حقيقية.'
+       :'سجّلي الدخول بحساب Firebase التجريبي الوحيد. هذه ليست نسخة معتمدة لحفظ بيانات طالبات حقيقية.';
+ $('authBox').innerHTML=enabled&&!user
+   ?'<form id="loginForm" class="toolbar"><input name="email" type="email" autocomplete="username" required placeholder="البريد التجريبي"><input name="password" type="password" autocomplete="current-password" required placeholder="كلمة المرور"><button class="primary">دخول Firebase</button></form>'
+   :enabled?'<p class="note">التجربة مخصصة لحساب واحد على أربعة أجهزة. المزامنة إلى Firestore ولا تحتاج كمبيوترًا يعمل باستمرار.</p>'
+    :'<p class="note">افتحي README_FIREBASE_AR.md واتّبعي إنشاء مشروع Firebase المجاني وتفعيل قواعد الوصول أولًا.</p>';
+ $('syncNow').disabled=!enabled||!user;
+ $('signOut').disabled=!enabled||!user;
+}
+
 function input(name,title,val='',required=false,type='text'){return `<div class="field"><label for="f_${name}">${title}</label><input id="f_${name}" name="${name}" type="${type}" value="${esc(val)}" ${required?'required':''}></div>`}
 function select(name,title,values,val='',required=false){return `<div class="field"><label for="f_${name}">${title}</label><select id="f_${name}" name="${name}" ${required?'required':''}>${values.map(([v,l])=>`<option value="${esc(v)}" ${v===val?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`}
 function textarea(name,title,val=''){return `<div class="field wide"><label for="f_${name}">${title}</label><textarea id="f_${name}" name="${name}">${esc(val)}</textarea></div>`}
@@ -57,6 +78,61 @@ async function exportJson(){const snapshot={schema:'guidance-v2-demo-1',exported
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000)}
 async function importJson(file){if(!file)return;let data;try{data=JSON.parse(await file.text());if(data.schema!=='guidance-v2-demo-1'||!tables.every(t=>Array.isArray(data[t])))throw new Error('نسخة غير مطابقة');if(!confirm('سيتم دمج بيانات نسخة تجريبية فقط. هل تريد المتابعة؟'))return;for(const t of tables)for(const r of data[t]){if(!r.id||!['p31','m34'].includes(r.school_code))throw Error('بنية غير صالحة');await put(t,r)}await refresh();notify('اكتمل استيراد البيانات التجريبية')}catch(err){notify('تعذر الاستيراد: '+err.message)}}
 function exportCSV(){const names=$('showNames').checked;const rows=[['التاريخ','المدرسة','النوع',...(names?['اسم الطالبة']:[]),'الحالة'],...reportData().map(e=>[e.date,schoolName(e.school_code),e.type,...(names?[byId(e.student_id)]:[]),e.status])];const safe=x=>{let v=String(x??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};download('تقرير-الموجهة-'+today()+'.csv','\ufeff'+rows.map(row=>row.map(safe).join(',')).join('\r\n'),'text/csv;charset=utf-8')}
-async function syncCloud(){if(!CloudClient.ready())return;if(busy)return;busy=true;$('syncStatus').textContent='جارٍ المزامنة';try{const s=await CloudClient.ensureSession();if(!s){renderSyncInfo();return}const queue=(await all('queue')).sort((a,b)=>a.created_at.localeCompare(b.created_at));for(const job of queue){await CloudClient.upsert(job.table,{...job.entity,owner_id:s.user.id});await remove('queue',job.id)}for(const t of tables){const remote=await CloudClient.fetchAll(t);for(const row of remote)await put(t,row)}await refresh();notify('المزامنة السحابية اكتملت');$('syncStatus').textContent='متصل بالسحابة'}catch(error){$('syncStatus').textContent='بانتظار الاتصال';$('syncStatus').className='status warn';notify('المزامنة غير مكتملة: '+error.message)}finally{busy=false}}
-function setup(){document.body.addEventListener('click',handleClick);$('school').addEventListener('change',e=>{state.school=e.target.value;$('studentProfile').classList.add('hidden');render()});$('studentSearch').addEventListener('input',renderStudents);$('studentGrade').addEventListener('change',renderStudents);for(const id of ['recordSearch','recordType','recordStatus'])$(id).addEventListener('input',renderEntries);for(const id of ['legacySearch','legacyCategory'])$(id).addEventListener('input',renderLegacy);for(const id of ['fromDate','toDate','reportType','reportStatus','showNames'])$(id).addEventListener('change',renderReports);$('quickAdd').onclick=()=>openEditor('entries');$('addRecord').onclick=()=>openEditor('entries');$('addStudent').onclick=()=>openEditor('students');$('addTask').onclick=()=>openEditor('tasks');$('closeEditor').onclick=$('cancelEditor').onclick=()=>$('editor').close();$('editorForm').addEventListener('submit',saveEditor);$('exportJson').onclick=exportJson;$('importJson').onchange=e=>importJson(e.target.files[0]);$('previewReport').onclick=renderReports;$('printReport').onclick=()=>{$('printArea').innerHTML=reportHTML();window.print()};$('exportCsv').onclick=exportCSV;$('syncNow').onclick=syncCloud;$('signOut').onclick=async()=>{if((await all('queue')).length){notify('يجب مزامنة التعديلات المعلقة قبل تسجيل الخروج');return}CloudClient.signOut();renderSyncInfo();notify('تم تسجيل الخروج')};$('authBox').addEventListener('submit',async e=>{if(e.target.id!=='loginForm')return;e.preventDefault();const form=new FormData(e.target);try{await CloudClient.signIn(form.get('email'),form.get('password'));renderSyncInfo();await syncCloud()}catch(error){notify('تعذر الدخول: '+error.message)}});window.addEventListener('online',()=>syncCloud());for(const id of ['recordType','reportType'])$(id).innerHTML='<option value="">كل الأقسام</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./service-worker.js').catch(()=>{})}
-(async function init(){try{db=await startDB();setup();await seedDemo();await refresh();if(CloudClient.ready()&&CloudClient.user())syncCloud();setInterval(()=>{if(navigator.onLine&&CloudClient.ready()&&CloudClient.user())syncCloud()},60000)}catch(err){document.querySelector('main').innerHTML='<div class="empty">تعذر بدء التطبيق المحلي. افتح الصفحة عبر HTTPS أو localhost.<div>'+esc(err.message)+'</div></div>'}})();
+async function syncCloud(){
+ if(!CloudClient.ready()||busy)return;
+ busy=true;
+ try{
+   const session=await CloudClient.ensureSession();
+   if(!session){await refresh();renderSyncInfo();return}
+   const queued=(await all('queue')).sort((a,b)=>a.created_at.localeCompare(b.created_at));
+   // Only the most recent unsent edit per document is pushed, to avoid
+   // duplicate updates while offline. Older queued edits stay until ACK.
+   const last=new Map();
+   for(const job of queued)last.set(job.table+':'+job.entity.id,job);
+   let pushed=0;
+   for(const [key,job] of last){
+     const updated=await CloudClient.upsert(job.table,{...job.entity,owner_id:session.user.id});
+     await put(job.table,updated);
+     for(const queuedJob of queued)if(queuedJob.table+':'+queuedJob.entity.id===key)await remove('queue',queuedJob.id);
+     pushed++;
+   }
+   if(!realtimeStarted){
+     await CloudClient.startListeners(async(table,rows)=>{
+       if(!db||!CloudClient.user())return;
+       const dirty=new Set((await all('queue')).filter(j=>j.table===table).map(j=>j.entity.id));
+       for(const row of rows)if(!dirty.has(row.id))await put(table,row);
+       await refresh();
+     });
+     realtimeStarted=true;
+   }
+   await refresh();
+   $('syncStatus').textContent='Firebase • متصل';
+   if(pushed)notify('تمت مزامنة '+pushed+' سجل تجريبي');
+ }catch(error){
+   $('syncStatus').textContent='مزامنة معلقة';
+   $('syncStatus').className='status warn';
+   notify('المزامنة غير مكتملة: '+(String(error.message||error).includes('CONFLICT')?'هناك تعديل متعارض محفوظ على هذا الجهاز':error.message));
+ }finally{busy=false}
+}
+function setup(){document.body.addEventListener('click',handleClick);$('school').addEventListener('change',e=>{state.school=e.target.value;$('studentProfile').classList.add('hidden');render()});$('studentSearch').addEventListener('input',renderStudents);$('studentGrade').addEventListener('change',renderStudents);for(const id of ['recordSearch','recordType','recordStatus'])$(id).addEventListener('input',renderEntries);for(const id of ['legacySearch','legacyCategory'])$(id).addEventListener('input',renderLegacy);for(const id of ['fromDate','toDate','reportType','reportStatus','showNames'])$(id).addEventListener('change',renderReports);$('quickAdd').onclick=()=>openEditor('entries');$('addRecord').onclick=()=>openEditor('entries');$('addStudent').onclick=()=>openEditor('students');$('addTask').onclick=()=>openEditor('tasks');$('closeEditor').onclick=$('cancelEditor').onclick=()=>$('editor').close();$('editorForm').addEventListener('submit',saveEditor);$('exportJson').onclick=exportJson;$('importJson').onchange=e=>importJson(e.target.files[0]);$('previewReport').onclick=renderReports;$('printReport').onclick=()=>{$('printArea').innerHTML=reportHTML();window.print()};$('exportCsv').onclick=exportCSV;$('syncNow').onclick=syncCloud;$('signOut').onclick=async()=>{if((await all('queue')).length){notify('يجب مزامنة التعديلات المعلقة قبل تسجيل الخروج');return}await CloudClient.signOut();realtimeStarted=false;await refresh();navigate('settings');notify('تم تسجيل الخروج')};$('authBox').addEventListener('submit',async e=>{if(e.target.id!=='loginForm')return;e.preventDefault();const form=new FormData(e.target);try{await CloudClient.signIn(form.get('email'),form.get('password'));await refresh();renderSyncInfo();await syncCloud()}catch(error){notify('تعذر الدخول: '+error.message)}});window.addEventListener('online',()=>syncCloud());for(const id of ['recordType','reportType'])$(id).innerHTML='<option value="">كل الأقسام</option>'+types.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('');if('serviceWorker'in navigator&&location.protocol==='https:')navigator.serviceWorker.register('./service-worker.js').catch(()=>{})}
+(async function init(){
+ try{
+   db=await startDB();setup();
+   if(CloudClient.ready()){
+     CloudClient.setAuthObserver(async user=>{
+       if(!db)return;
+       if(!user){realtimeStarted=false;await refresh();navigate('settings')}
+       else {await refresh();void syncCloud()}
+     });
+     await CloudClient.ensureSession();
+   } else {await seedDemo();}
+   await refresh();
+   if(CloudClient.ready()&&!CloudClient.user())navigate('settings');
+   if(CloudClient.ready()&&CloudClient.user())void syncCloud();
+   // Firebase realtime listeners perform remote updates: this interval only
+   // retries queued offline edits, not full collection reads.
+   setInterval(async()=>{
+     if(navigator.onLine&&CloudClient.ready()&&CloudClient.user()&&(await all('queue')).length)void syncCloud()
+   },45000);
+ }catch(err){document.querySelector('main').innerHTML='<div class="empty">تعذر بدء التطبيق المحلي. افتح الصفحة عبر HTTPS أو localhost.<div>'+esc(err.message)+'</div></div>'}
+})();
