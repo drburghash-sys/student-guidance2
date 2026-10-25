@@ -28,6 +28,7 @@
         projectId: config.projectId, appId: config.appId
       }, 'student-guidance-v2-demo');
       const auth = authLib.getAuth(app);
+      auth.languageCode = 'ar'; // Firebase supports Arabic email-link templates.
       // No durable Firestore cache: the browser's existing test IndexedDB is still
       // unencrypted. All real student data remains disallowed at this stage.
       const db = storeLib.initializeFirestore(app,{localCache:storeLib.memoryLocalCache()});
