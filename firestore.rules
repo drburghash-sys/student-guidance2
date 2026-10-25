@@ -1,0 +1,36 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // IMPORTANT: replace UID below with Firebase Authentication UID of the ONLY
+    // approved demo user before publishing rules. Unknown UID = deny all.
+    function authorized(uid) {
+      return request.auth != null &&
+        request.auth.uid == uid &&
+        request.auth.uid == "REPLACE_WITH_TEST_UID";
+    }
+    function knownTable(table) {
+      return table in ['students','entries','tasks','legacy_records'];
+    }
+    function validRecord(uid,documentId) {
+      return request.resource.data.id == documentId &&
+        request.resource.data.owner_id == uid &&
+        request.resource.data.school_code in ['p31','m34'] &&
+        request.resource.data.revision is int;
+    }
+    match /users/{uid}/{table}/{documentId} {
+      allow get, list: if authorized(uid) && knownTable(table);
+      allow create: if authorized(uid) && knownTable(table) &&
+        validRecord(uid,documentId) &&
+        request.resource.data.revision == 1;
+      allow update: if authorized(uid) && knownTable(table) &&
+        validRecord(uid,documentId) &&
+        resource.data.owner_id == uid &&
+        request.resource.data.school_code == resource.data.school_code &&
+        request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
