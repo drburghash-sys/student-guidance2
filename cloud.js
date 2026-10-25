@@ -14,5 +14,13 @@ async function signIn(email,password){const t=await request('/auth/v1/token?gran
 function signOut(){session=null;localStorage.removeItem(key)}
 async function fetchAll(table){const s=await ensureSession();if(!s)throw new Error('يرجى تسجيل الدخول للمزامنة');return request(`/rest/v1/${table}?select=*&order=updated_at.asc&limit=10000`,'GET',null,s.access_token)}
 async function upsert(table,value){const s=await ensureSession();if(!s)throw new Error('انتهت الجلسة، سجلي الدخول مجددًا');return request(`/rest/v1/${table}?on_conflict=id`,'POST',value,s.access_token,{'Prefer':'resolution=merge-duplicates,return=minimal'})}
-window.CloudClient={ready,signIn,signOut,ensureSession,fetchAll,upsert,user:()=>session?.user||null};
+async function insertManyIfMissing(table,rows,batchSize=25,onProgress=()=>{}) {
+ if(!['students','legacy_records'].includes(table))throw new Error('جدول النقل غير معتمد');
+ const s=await ensureSession();if(!s)throw new Error('انتهت جلسة الدخول');
+ for(let i=0;i<rows.length;i+=batchSize){
+   await request('/rest/v1/'+table+'?on_conflict=id','POST',rows.slice(i,i+batchSize),s.access_token,{'Prefer':'resolution=ignore-duplicates,return=minimal'});
+   onProgress(Math.min(i+batchSize,rows.length));
+ }
+}
+window.CloudClient={ready,signIn,signOut,ensureSession,fetchAll,upsert,insertManyIfMissing,user:()=>session?.user||null};
 })();
