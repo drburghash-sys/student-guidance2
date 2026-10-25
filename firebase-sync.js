@@ -77,6 +77,7 @@
     const address=String(email||'').trim();
     if(!address)throw Error('أدخلي البريد الذي وصله رابط الدخول.');
     const result=await c.authLib.signInWithEmailLink(c.auth,address,link);
+    lastAuthenticatedUser=result.user;
     window.localStorage.removeItem(emailKey);
     emailConfirmationRequired=false;
     // Discard one-time sign-in code from browser history after redemption.
