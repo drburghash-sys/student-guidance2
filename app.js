@@ -311,30 +311,46 @@ async function saveEditor(e){
 async function removeStudentSafely(id){
  const student=state.students.find(s=>s.id===id&&!s.is_deleted&&s.school_code===state.school);
  if(!student){notify('لم يتم العثور على الطالبة في المدرسة الحالية.');return}
- let linked=state.entries.filter(e=>e.student_id===id&&!e.is_deleted);
- if(CloudClient.ready()){
-   if(!navigator.onLine){
-     notify('لحماية السجلات، الحذف متاح أثناء الاتصال بالإنترنت فقط.');return;
-   }
-   try{
-     // Verify against Firestore rather than trusting an incomplete local cache.
-     const remote=await CloudClient.fetchAll('entries');
-     linked=linked.concat(remote.filter(e=>e.student_id===id&&!e.is_deleted));
-   }catch(error){
-     notify('تعذر التحقق من السجلات المرتبطة؛ لم تُحذف الطالبة.');return;
-   }
+ if(!CloudClient.ready()||!CloudClient.user()){
+   notify('يلزم تسجيل الدخول إلى Firebase لحذف الطالبة وسجلاتها.');return;
  }
- if(linked.length){
-   alert('لم تُحذف الطالبة: توجد سجلات مرتبطة بها. حفاظًا على السجلات القديمة، صحّحي بياناتها بزر «تعديل»، أو راجعي ارتباط الحالات قبل الحذف.');
-   return;
- }
- if(!confirm('حذف الطالبة «'+student.name+'» من قائمة '+schoolName(student.school_code)+'؟\nلن تُحذف أي سجلات أو بيانات لطالبات أخريات. ستُخفى الطالبة من القائمة ويُحفظ تعديل الحذف في Firebase عند اكتمال المزامنة.'))return;
+ if(!navigator.onLine){notify('الحذف الكامل يحتاج اتصالًا بالإنترنت.');return}
+ if(busy){notify('هناك مزامنة جارية؛ أعيدي المحاولة بعد اكتمالها.');return}
+ busy=true;
  try{
-   await save('students',{...student,is_deleted:true});
+   // Count exact linked IDs in Firestore; never cascade by name or grade.
+   const preview=await CloudClient.previewStudentDeletion(id,state.school);
+   const {counts,docs}=preview;
+   const pending=await all('queue');
+   if(pending.some(j=>docs.some(d=>d.table===j.table&&d.id===j.entity?.id))){
+     alert('توجد تعديلات غير متزامنة تخص هذه الطالبة أو سجلاتها. نفّذي «مزامنة الآن» أولًا، ثم أعيدي محاولة الحذف. لم يُحذف شيء.');
+     return;
+   }
+   const targetName=preview.student.name||student.name;
+   const msg='حذف نهائي من Firebase للطالبة: «'+targetName+'»\nالمدرسة: '+schoolName(state.school)+
+    '\nسجلات الحالات: '+counts.entries+'\nسجلات الأرشيف المرتبطة: '+counts.legacy+
+    '\nالمهام المرتبطة: '+counts.tasks+
+    '\n\nسيُحذف ملف الطالبة وكل هذه السجلات، بما فيها تفاصيلها وإجراءاتها، من الحساب المتزامن على الأجهزة. لن تُحذف أي طالبة أو حالة أخرى. هل تؤكدين الحذف النهائي؟';
+   if(!confirm(msg))return;
+   const deleted=await CloudClient.deleteStudentBundle(preview);
+   // Clear local IndexedDB after a successful atomic cloud delete, including
+   // copies loaded on this device. Other active devices receive removal events.
+   const stores=[...new Set(deleted.map(x=>x.table))];
+   await new Promise((resolve,reject)=>{
+     const transaction=db.transaction(stores,'readwrite');
+     for(const d of deleted)transaction.objectStore(d.table).delete(d.id);
+     transaction.oncomplete=resolve;
+     transaction.onerror=()=>reject(transaction.error||Error('تعذر تنظيف نسخة الجهاز'));
+     transaction.onabort=()=>reject(transaction.error||Error('تعذر إتمام تنظيف نسخة الجهاز'));
+   });
    $('studentProfile').classList.add('hidden');
-   notify('أُخفيت الطالبة المحددة؛ تحققي من اكتمال المزامنة مع Firebase.');
- }catch(error){notify('لم يكتمل حذف الطالبة: '+String(error.message||error))}
+   await refresh();
+   notify('تم حذف الطالبة و'+(deleted.length-1)+' سجلات مرتبطة بها من Firebase.');
+ }catch(error){
+   notify('لم يكتمل الحذف: '+String(error.message||error));
+ }finally{busy=false}
 }
+
 async function handleClick(e){const b=e.target.closest('button');if(!b)return;if(b.dataset.page)navigate(b.dataset.page);if(b.dataset.type!==undefined){$('recordType').value=types[Number(b.dataset.type)];navigate('records')}if(b.dataset.profile)showProfile(b.dataset.profile);if(b.dataset.removeStudent)await removeStudentSafely(b.dataset.removeStudent);if(b.dataset.closeprofile)$('studentProfile').classList.add('hidden');if(b.dataset.newrecord)openEditor('entries',null,b.dataset.newrecord);if(b.dataset.edit){const [kind,id]=b.dataset.edit.split(':');openEditor(kind,id)}if(b.dataset.toggleentry){const x=state.entries.find(v=>v.id===b.dataset.toggleentry);if(x&&['مفتوحة','مغلقة'].includes(x.status))await save('entries',{...x,status:x.status==='مفتوحة'?'مغلقة':'مفتوحة'});else if(x)openEditor('entries',x.id)}if(b.dataset.toggletask){const x=state.tasks.find(v=>v.id===b.dataset.toggletask);if(x)await save('tasks',{...x,done:!x.done})}}
 async function exportJson(){const snapshot={schema:'guidance-v2-demo-1',exported_at:stamp(),warning:'بيانات تجريبية فقط',students:state.students,entries:state.entries,tasks:state.tasks};download('student-guidance-demo-'+today()+'.json',JSON.stringify(snapshot,null,2),'application/json');notify('تم تنزيل النسخة التجريبية')}
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000)}
@@ -424,10 +440,19 @@ async function syncCloud(){
      pushed++;
    }
    if(!realtimeStarted){
-     await CloudClient.startListeners(async(table,rows)=>{
+     await CloudClient.startListeners(async(table,rows,removedIds=[],allRemoteIds=null)=>{
        if(!db||!CloudClient.user())return;
        const dirty=new Set((await all('queue')).filter(j=>j.table===table).map(j=>j.entity.id));
        for(const row of rows)if(!dirty.has(row.id))await put(table,row);
+       for(const id of removedIds)if(!dirty.has(id))await remove(table,id);
+       // After reconnect, reconcile old local records that were deleted while
+       // this device was offline. Preserve locally queued unsent work.
+       if(allRemoteIds){
+         const existing=await all(table),serverIds=new Set(allRemoteIds);
+         for(const row of existing){
+           if(!serverIds.has(row.id)&&!dirty.has(row.id))await remove(table,row.id);
+         }
+       }
        await refresh();
      });
      realtimeStarted=true;
