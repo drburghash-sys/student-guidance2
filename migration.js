@@ -19,7 +19,7 @@ function gradeSchool(row){
  const grade=norm(row.grade||'').toLowerCase();
  if(!grade)return '';
  if(/مت(?:و|ي)سط/.test(grade)||/(?:^| )(?:اول|ثاني|ثالث) م(?:ت|$)/.test(grade)||/^[123]م$/.test(grade))return 'm34';
- if(/ابتدا(?:ئي|ي)/.test(grade)||/\b(?:رابع|خامس|سادس)\b/.test(grade))return 'p31';
+ if(/ابتدا(?:ئي|ي)/.test(grade)||/(?:^|\s)(?:رابع|خامس|سادس)(?:$|\s)/.test(grade))return 'p31';
  if(/^[456]$/.test(grade))return 'p31';
  const classlike=grade.match(/^[1-9]\s*\/\s*([1-6])$/);
  if(classlike&&Number(classlike[1])>=4)return 'p31';  // malformed old grade, see quality message
