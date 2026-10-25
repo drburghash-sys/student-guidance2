@@ -78,7 +78,7 @@ function availability(){
  $('transfer').disabled=loading||!inspection||!inspection.total||count>0||!cloudReady||!logged||!approved||!consent||!backup;
  $('cloudInfo').textContent=!cloudReady?'إعداد Firebase غير مكتمل.':
    !logged?'لا توجد جلسة Firebase معتمدة في هذه الصفحة. افتحي البرنامج وسجلي الدخول ثم عودي لأداة الترحيل.':
-   !approved?'يتعذر الاستيراد: حساب Firebase غير معتمد.':
+   !approved?'هذا الرابط مخصص للفحص فقط. لنقل البيانات يلزم نشر التطبيق على Firebase Hosting بعنوان مستقل، ثم تسجيل الدخول والتأكد من التصريح.':
    count?'حددي مدرسة كل سجل غير واضح قبل الاستيراد ('+count+' سجلات).':
    !consent||!backup?'أقري بوجود تصريح من الجهة المسؤولة وبقاء نسخة احتياطية آمنة، حتى يتاح زر النقل.':
    'جاهز للنقل بعد التأكيد النهائي. ستُرسل السجلات إلى Firestore؛ قد يتعذر التراجع دون إجراء إداري منفصل.';
