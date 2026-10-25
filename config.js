@@ -8,8 +8,7 @@ window.GUIDANCE_FIREBASE = {
   authDomain: 'student-guidance2.firebaseapp.com',
   projectId: 'student-guidance2',
   appId: '1:11471604599:web:3fddf6f8a543fb772d6f72',
-  emailLinkUrl: 'https://drburghash-sys.github.io/student-guidance2/', // Authorized domain: drburghash-sys.github.io
-  allowedUid: '', // Set only after account created and verified in Firebase Auth.
+  allowedUid: '', // Set after creating the test user in Firebase Authentication (UID only).
   mode: 'demo',
   allowLegacyImport: false
 };
