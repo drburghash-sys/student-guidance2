@@ -34,5 +34,5 @@ if [[ ! -d icons ]]; then echo "Missing icons directory" >&2; exit 1; fi
 cp -R -- icons "$out/"
 echo "Safe static files prepared (no real student backups included)."
 echo "Publishing to Firebase Hosting project: student-guidance2"
-firebase deploy --only hosting --project student-guidance2
+firebase deploy --only hosting,firestore:rules --project student-guidance2
 echo "If deployment succeeded, open https://student-guidance2.web.app/"
