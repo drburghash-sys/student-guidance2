@@ -104,13 +104,80 @@
       return next;
     });
   }
+  // Preview an exact-id cascade. Never match a person by name because
+  // different pupils can share a name, and old archives have ambiguities.
+  async function previewStudentDeletion(studentId,schoolCode){
+    if(!studentId || !['p31','m34'].includes(schoolCode))throw Error('مدرسة أو معرف غير صالح.');
+    const {c,s}=await collectionFor('students');
+    const ref=c.storeLib.doc(c.db,'users',s.user.id,'students',String(studentId));
+    const found=await c.storeLib.getDoc(ref);
+    if(!found.exists())throw Error('ملف الطالبة غير موجود في Firebase.');
+    const student=found.data();
+    if(student.id!==studentId||student.school_code!==schoolCode||student.owner_id!==s.user.id)
+      throw Error('ملف الطالبة لا يطابق المدرسة والحساب الحالي.');
+    const [entries,archives,tasks]=await Promise.all([
+      fetchAll('entries'),fetchAll('legacy_records'),fetchAll('tasks')
+    ]);
+    const valid=r=>r.school_code===schoolCode&&r.owner_id===s.user.id;
+    const linkedArchives=archives.filter(r=>valid(r)&&r.student_id===studentId);
+    const archiveIds=new Set(linkedArchives.map(r=>r.id));
+    const linkedEntries=entries.filter(r=>valid(r)&&(
+      r.student_id===studentId||(r.source_legacy_id&&archiveIds.has(r.source_legacy_id))));
+    const linkedTasks=tasks.filter(r=>valid(r)&&r.student_id===studentId);
+    const docs=[
+      ...linkedEntries.map(r=>({table:'entries',id:r.id})),
+      ...linkedArchives.map(r=>({table:'legacy_records',id:r.id})),
+      ...linkedTasks.map(r=>({table:'tasks',id:r.id})),
+      {table:'students',id:studentId}
+    ];
+    if(docs.length>250)throw Error('عدد السجلات المرتبطة كبير، يلزم إجراء حذف مراجع ومجزأ.');
+    return {student,docs,counts:{entries:linkedEntries.length,legacy:linkedArchives.length,tasks:linkedTasks.length}};
+  }
+  async function deleteStudentBundle(preview){
+    const {student,docs}=preview||{};
+    if(!student?.id||!['p31','m34'].includes(student.school_code)||
+       !Array.isArray(docs)||docs.length<1||docs.length>250)
+      throw Error('طلب الحذف غير صالح.');
+    if(docs.at(-1).table!=='students'||docs.at(-1).id!==student.id)
+      throw Error('ملف الطالبة ليس ضمن مجموعة الحذف.');
+    const {c,s}=await collectionFor('students');
+    if(student.owner_id!==s.user.id)throw Error('الحذف غير مصرح به.');
+    const refs=docs.map(({table,id})=>{
+      if(!validTables.has(table)||!id)throw Error('نوع سجل غير صالح للحذف.');
+      return c.storeLib.doc(c.db,'users',s.user.id,table,String(id))
+    });
+    // One atomic server transaction removes the selected pupil and all verified
+    // linked records. Any failed rule/transaction leaves every document intact.
+    await c.storeLib.runTransaction(c.db,async tx=>{
+      const snapshots=[];
+      for(const ref of refs)snapshots.push(await tx.get(ref));
+      for(let i=0;i<snapshots.length;i++){
+        const snapshot=snapshots[i],item=docs[i];
+        if(!snapshot.exists())throw Error('تغيّر أحد السجلات أثناء المراجعة. أعيدي المحاولة.');
+        const row=snapshot.data();
+        if(row.id!==item.id || row.owner_id!==s.user.id ||
+           row.school_code!==student.school_code)
+          throw Error('تغيّر ارتباط أحد السجلات؛ ألغي الحذف حفاظًا على البيانات.');
+        if(item.table!=='students' && row.student_id!==student.id &&
+           !(item.table==='entries'&&docs.some(d=>d.table==='legacy_records'&&d.id===row.source_legacy_id)))
+          throw Error('أحد السجلات لا يرتبط بالطالبة المحددة.');
+      }
+      for(const ref of refs)tx.delete(ref);
+    });
+    return docs;
+  }
   async function startListeners(onRows) {
     const {c,s}=await collectionFor('students');
     if(listeners.length)return;
     for(const table of validTables){
       const coll=c.storeLib.collection(c.db,'users',s.user.id,table);
       const unsub=c.storeLib.onSnapshot(coll,
-        snapshot=>{const changed=snapshot.docChanges().filter(ch=>ch.type!=='removed').map(ch=>ch.doc.data());if(changed.length)Promise.resolve(onRows(table,changed)).catch(()=>{});},
+        snapshot=>{
+          const changed=snapshot.docChanges();
+          const upserts=changed.filter(ch=>ch.type!=='removed').map(ch=>ch.doc.data());
+          const removed=changed.filter(ch=>ch.type==='removed').map(ch=>ch.doc.id);
+          if(upserts.length||removed.length)Promise.resolve(onRows(table,upserts,removed)).catch(()=>{});
+        },
         error=>{console.warn('تعذر استقبال تغييرات Firestore ('+table+')',error.code||'');});
       listeners.push(unsub);
     }
@@ -167,7 +234,7 @@
     ready:enabled,
     user:()=>authUser,
     setAuthObserver:callback=>{notifyAuth=callback;},
-    ensureSession,signIn,bootstrapUid,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,
+    ensureSession,signIn,bootstrapUid,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,previewStudentDeletion,deleteStudentBundle,
     allowLegacyImport:()=>Boolean(config.allowedUid && config.mode==='demo' && approvedWebOrigin())
   };
 })();
