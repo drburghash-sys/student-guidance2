@@ -171,12 +171,19 @@
     if(listeners.length)return;
     for(const table of validTables){
       const coll=c.storeLib.collection(c.db,'users',s.user.id,table);
+      let serial=Promise.resolve();
       const unsub=c.storeLib.onSnapshot(coll,
         snapshot=>{
           const changed=snapshot.docChanges();
           const upserts=changed.filter(ch=>ch.type!=='removed').map(ch=>ch.doc.data());
           const removed=changed.filter(ch=>ch.type==='removed').map(ch=>ch.doc.id);
-          if(upserts.length||removed.length)Promise.resolve(onRows(table,upserts,removed)).catch(()=>{});
+          // Reconcile after receiving the authoritative cloud snapshot; this
+          // also removes records deleted while a different device was offline.
+          const ids=snapshot.metadata.fromCache?null:snapshot.docs.map(d=>d.id);
+          if(upserts.length||removed.length||ids!==null)
+            serial=serial.then(()=>onRows(table,upserts,removed,ids)).catch(error=>{
+              console.warn('تعذر معالجة مزامنة Firestore',error.message||error);
+            });
         },
         error=>{console.warn('تعذر استقبال تغييرات Firestore ('+table+')',error.code||'');});
       listeners.push(unsub);
