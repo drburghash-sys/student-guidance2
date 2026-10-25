@@ -1,0 +1,11 @@
+# Never commit generated deployment output or school data
+.firebase-deploy-safe-public/
+node_modules/
+.env*
+*.sqlite
+*.sqlite3
+*.db
+*.backup
+*.bak
+نسخة_احتياطية_نظام_الموجهة*.json
+*student-guidance*backup*.json
