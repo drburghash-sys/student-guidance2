@@ -312,6 +312,60 @@ async function handleClick(e){const b=e.target.closest('button');if(!b)return;if
 async function exportJson(){const snapshot={schema:'guidance-v2-demo-1',exported_at:stamp(),warning:'بيانات تجريبية فقط',students:state.students,entries:state.entries,tasks:state.tasks};download('student-guidance-demo-'+today()+'.json',JSON.stringify(snapshot,null,2),'application/json');notify('تم تنزيل النسخة التجريبية')}
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000)}
 async function importJson(file){if(!file)return;let data;try{data=JSON.parse(await file.text());if(data.schema!=='guidance-v2-demo-1'||!tables.every(t=>Array.isArray(data[t])))throw new Error('نسخة غير مطابقة');if(!confirm('سيتم دمج بيانات نسخة تجريبية فقط. هل تريد المتابعة؟'))return;for(const t of tables)for(const r of data[t]){if(!r.id||!['p31','m34'].includes(r.school_code))throw Error('بنية غير صالحة');await put(t,r)}await refresh();notify('اكتمل استيراد البيانات التجريبية')}catch(err){notify('تعذر الاستيراد: '+err.message)}}
+// Generate PDF bytes locally; no report data is uploaded to another service.
+function reportPdfPayload(){
+ const rows=reportData().map(e=>({
+   date:e.date||'',type:e.type||'',studentName:e.student_name||byId(e.student_id),
+   subject:subjectFor(e),details:detailsFor(e),action:actionFor(e),status:statusFor(e)
+ }));
+ return {school:schoolName(state.school),date:today(),showNames:$('showNames').checked,rows};
+}
+function createReportPdf(){
+ if(CloudClient.ready()&&!CloudClient.user())throw Error('يجب تسجيل الدخول لعرض التقارير.');
+ if(!window.GuidancePdf?.generate)throw Error('تعذر تحميل أداة إنشاء PDF. حدثي الصفحة وجربي مجددًا.');
+ const payload=reportPdfPayload();
+ const blob=window.GuidancePdf.generate(payload);
+ const fileName='student-guidance-'+state.school+'-'+today()+'.pdf';
+ return {blob,fileName,school:payload.school};
+}
+function downloadPdfFile(blob,fileName){
+ const url=URL.createObjectURL(blob),a=document.createElement('a');
+ a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),15000);
+}
+function downloadReportPDF(){
+ try{
+   const {blob,fileName}=createReportPdf();
+   downloadPdfFile(blob,fileName);
+   notify('تم تجهيز ملف PDF وتنزيله على الجهاز.');
+ }catch(err){notify('تعذر إنشاء PDF: '+(err.message||err))}
+}
+function shareReportPDF(){
+ let output;
+ try{output=createReportPdf()}catch(err){notify('تعذر إنشاء PDF: '+(err.message||err));return}
+ const {blob,fileName,school}=output;
+ try{
+   const file=new File([blob],fileName,{type:'application/pdf',lastModified:Date.now()});
+   const files=[file];
+   if(typeof navigator.share==='function'&&(!navigator.canShare||navigator.canShare({files}))){
+     // Invoke share immediately in the button event; do not await/confirm
+     // beforehand as Web Share requires a direct user gesture.
+     navigator.share({files,title:'تقرير الموجّهة الطلابية — '+school})
+       .then(()=>notify('تم فتح مشاركة PDF على الجهاز.'))
+       .catch(err=>{
+         if(err?.name==='AbortError')return; // user cancelled the native sheet
+         downloadPdfFile(blob,fileName);
+         notify('تعذرت المشاركة المباشرة؛ نُزّل PDF ويمكن مشاركته من تطبيق الملفات.');
+       });
+   }else{
+     downloadPdfFile(blob,fileName);
+     notify('متصفحك لا يدعم مشاركة ملفات PDF مباشرة؛ نُزّل الملف لتشاركيه من تطبيق الملفات.');
+   }
+ }catch(err){
+   downloadPdfFile(blob,fileName);
+   notify('المشاركة غير مدعومة هنا؛ نُزّل التقرير بصيغة PDF.');
+ }
+}
 function exportCSV(){
  const names=$('showNames').checked;
  const rows=[['التاريخ','المدرسة','القسم',...(names?['اسم الطالبة']:[]),'موضوع الحالة','التفاصيل والملاحظات','الإجراء المتخذ','حالة المتابعة'],
@@ -372,7 +426,7 @@ function setup(){document.body.addEventListener('click',handleClick);$('school')
    const found=e.target.closest('[data-select-student]');
    if(found){chooseStudent(found.dataset.selectStudent);return;}
    if(e.target.closest('#toggleInlineStudent'))toggleNewStudent();
- });$('exportJson').onclick=exportJson;$('importJson').onchange=e=>importJson(e.target.files[0]);$('previewReport').onclick=renderReports;$('printReport').onclick=()=>{$('printArea').innerHTML=reportHTML();window.print()};$('exportCsv').onclick=exportCSV;$('syncNow').onclick=syncCloud;$('signOut').onclick=async()=>{if((await all('queue')).length){notify('يجب مزامنة التعديلات المعلقة قبل تسجيل الخروج');return}await CloudClient.signOut();realtimeStarted=false;await refresh();navigate('settings');notify('تم تسجيل الخروج')};$('authBox').addEventListener('submit',async e=>{
+ });$('exportJson').onclick=exportJson;$('importJson').onchange=e=>importJson(e.target.files[0]);$('previewReport').onclick=renderReports;$('printReport').onclick=()=>{$('printArea').innerHTML=reportHTML();window.print()};$('downloadPdf').onclick=downloadReportPDF;$('sharePdf').onclick=shareReportPDF;$('exportCsv').onclick=exportCSV;$('syncNow').onclick=syncCloud;$('signOut').onclick=async()=>{if((await all('queue')).length){notify('يجب مزامنة التعديلات المعلقة قبل تسجيل الخروج');return}await CloudClient.signOut();realtimeStarted=false;await refresh();navigate('settings');notify('تم تسجيل الخروج')};$('authBox').addEventListener('submit',async e=>{
  if(e.target.id!=='loginForm')return;
  e.preventDefault();
  const form=new FormData(e.target),button=e.target.querySelector('button[type="submit"]');
