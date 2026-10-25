@@ -73,9 +73,9 @@ function render(){
 }
 function availability(){
  const count=rows.filter(r=>!assigned(r)).length;
- const cloudReady=CloudClient.ready(),logged=!!CloudClient.user();
- $('transfer').disabled=loading||!inspection||!inspection.total||count>0||!cloudReady||!logged;
- $('cloudInfo').textContent=!cloudReady?'النقل السحابي غير مفعل في رابط GitHub Pages أو قبل اعتماد استضافة مستقلة. يمكنك معاينة الملف محليًا فقط.':!logged?'يلزم تسجيل الدخول بحساب الموجّهة المصرح به على نطاق مستقل.':count?'توجد '+count+' سجلات لم تُحدَّد مدرستها.':'المصدر جاهز مبدئيًا؛ يجب التحقق من الموافقات والصلاحيات والنسخة الاحتياطية قبل التنفيذ.';
+ const cloudReady=CloudClient.ready(),logged=!!CloudClient.user(),approved=CloudClient.allowLegacyImport?.()===true;
+ $('transfer').disabled=loading||!inspection||!inspection.total||count>0||!cloudReady||!logged||!approved;
+ $('cloudInfo').textContent=!approved?'استيراد سجلات الطالبات الحقيقية إلى Firebase معطل صراحةً في هذه المرحلة؛ هذه أداة فحص محلي فقط.':!cloudReady?'لم يجهز اتصال Firebase بعد.':!logged?'يرجى تسجيل الدخول بالحساب المعتمد.':count?'توجد '+count+' سجلات لم تُحدد مدرستها.':'تحققي من موافقة الجهة ونسخة احتياطية مستقلة قبل النقل.';
 }
 function validate(json){
  const db=json?.db??json;
@@ -127,6 +127,7 @@ async function prepare(owner){
 }
 $('transfer').onclick=async()=>{
  if(loading||!source||!inspection||rows.some(r=>!assigned(r)))return;
+ if(CloudClient.allowLegacyImport?.()!==true){status('نقل البيانات الحقيقية إلى Firebase محظور حتى اعتماد الأمان والخصوصية.');return}
  const session=await CloudClient.ensureSession();
  if(!session){status('انتهت جلسة الدخول. لم تُرسل بيانات.');availability();return}
  if(!confirm('تأكيد أخير: هل تمت الموافقة على مكان التخزين والربط ونقل بيانات جميع الطالبات؟ لا يمكن التراجع تلقائيًا عن استيراد سحابي.'))return;
