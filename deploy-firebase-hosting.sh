@@ -9,8 +9,17 @@ if ! command -v firebase >/dev/null 2>&1; then
 fi
 out=".firebase-deploy-safe-public"
 if [[ -e "$out" ]]; then
-  echo "Safety check: $out already exists; inspect and remove it before retrying." >&2
-  exit 1
+  if [[ -L "$out" || ! -d "$out" ]]; then echo "Invalid staging directory" >&2; exit 1; fi
+  # Only remove an earlier generated public folder if it contains exclusively
+  # known static files and icons; refuse any unexpected, possibly private file.
+  for entry in "$out"/* "$out"/.[!.]* "$out"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    case "${entry##*/}" in
+      index.html|migration.html|styles.css|app.js|migration.js|firebase-sync.js|config.js|service-worker.js|manifest.webmanifest|robots.txt|icons) ;;
+      *) echo "Unexpected file in staging folder; refusing to redeploy: $entry" >&2; exit 1 ;;
+    esac
+  done
+  rm -rf -- "$out"
 fi
 mkdir -p "$out"
 for f in index.html migration.html styles.css app.js migration.js \
