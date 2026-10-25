@@ -148,8 +148,8 @@
             const data=before.data();
             if(data.owner_id!==row.owner_id || data.school_code!==row.school_code)
               throw Error('تعارض معرف موجود في قاعدة البيانات: '+row.id);
-            if(table==='legacy_records' && data.source_id!==row.source_id)
-              throw Error('سجل أصلي مختلف يستعمل المعرّف نفسه.');
+            if(table==='legacy_records' && (data.source_id!==row.source_id || data.source_fingerprint!==row.source_fingerprint))
+              throw Error('محتوى السجل الأصلي مختلف عن نسخة مستوردة سابقًا؛ لا يمكن استبداله تلقائيًا.');
             if(table==='entries' && data.source_legacy_id!==row.source_legacy_id)
               throw Error('سجل جديد مختلف يستعمل المعرّف نفسه.');
             return false;
