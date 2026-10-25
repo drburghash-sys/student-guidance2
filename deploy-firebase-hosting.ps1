@@ -11,7 +11,7 @@ if (Test-Path -LiteralPath $target) {
 }
 New-Item -ItemType Directory -Path $target | Out-Null
 $publicFiles = @('index.html','migration.html','styles.css','app.js','migration.js',
-    'firebase-sync.js','config.js','service-worker.js','manifest.webmanifest','robots.txt')
+    'firebase-sync.js','config.js','pdf-export.js','service-worker.js','manifest.webmanifest','robots.txt')
 foreach ($file in $publicFiles) {
   $source = Join-Path $PSScriptRoot $file
   if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Missing public asset: $file" }
