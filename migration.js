@@ -134,7 +134,7 @@ async function prepare(owner){
   const base={id,owner_id:owner,school_code:school,category:r.cat,student_id:studentId,
     student_name:name,grade,class_name:cls,source_key:id,source_index:r.index,
     source_id:String(item.id??''),event_date:/^\d{4}-\d{2}-\d{2}$/.test(String(item.date||''))?item.date:null,
-    raw_data:item,updated_at:time,revision:1,is_deleted:false};
+    raw_data:item,source_fingerprint:await idFor('guidance-v2-raw|'+JSON.stringify(item)),updated_at:time,revision:1,is_deleted:false};
   records.push(base);
   const detail=[item.type,item.reason,item.notes].filter(x=>String(x||'').trim()).map(String).join(' — ');
   const detail2=[item.result,item.lives&&('المعيشة: '+item.lives),item.level&&('الأهمية: '+item.level),
