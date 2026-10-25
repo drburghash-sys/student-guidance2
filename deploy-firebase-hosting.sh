@@ -15,7 +15,7 @@ if [[ -e "$out" ]]; then
   for entry in "$out"/* "$out"/.[!.]* "$out"/..?*; do
     [[ -e "$entry" || -L "$entry" ]] || continue
     case "${entry##*/}" in
-      index.html|migration.html|styles.css|app.js|migration.js|firebase-sync.js|config.js|service-worker.js|manifest.webmanifest|robots.txt|icons) ;;
+      index.html|migration.html|styles.css|app.js|migration.js|firebase-sync.js|config.js|pdf-export.js|service-worker.js|manifest.webmanifest|robots.txt|icons) ;;
       *) echo "Unexpected file in staging folder; refusing to redeploy: $entry" >&2; exit 1 ;;
     esac
   done
@@ -23,7 +23,7 @@ if [[ -e "$out" ]]; then
 fi
 mkdir -p "$out"
 for f in index.html migration.html styles.css app.js migration.js \
-  firebase-sync.js config.js service-worker.js manifest.webmanifest robots.txt; do
+  firebase-sync.js config.js pdf-export.js service-worker.js manifest.webmanifest robots.txt; do
   if [[ ! -f "$f" ]]; then
     echo "Missing required static asset: $f" >&2
     exit 1
