@@ -306,7 +306,18 @@ async function handleClick(e){const b=e.target.closest('button');if(!b)return;if
 async function exportJson(){const snapshot={schema:'guidance-v2-demo-1',exported_at:stamp(),warning:'بيانات تجريبية فقط',students:state.students,entries:state.entries,tasks:state.tasks};download('student-guidance-demo-'+today()+'.json',JSON.stringify(snapshot,null,2),'application/json');notify('تم تنزيل النسخة التجريبية')}
 function download(name,content,type){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([content],{type}));a.href=url;a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{a.remove();URL.revokeObjectURL(url)},1000)}
 async function importJson(file){if(!file)return;let data;try{data=JSON.parse(await file.text());if(data.schema!=='guidance-v2-demo-1'||!tables.every(t=>Array.isArray(data[t])))throw new Error('نسخة غير مطابقة');if(!confirm('سيتم دمج بيانات نسخة تجريبية فقط. هل تريد المتابعة؟'))return;for(const t of tables)for(const r of data[t]){if(!r.id||!['p31','m34'].includes(r.school_code))throw Error('بنية غير صالحة');await put(t,r)}await refresh();notify('اكتمل استيراد البيانات التجريبية')}catch(err){notify('تعذر الاستيراد: '+err.message)}}
-function exportCSV(){const names=$('showNames').checked;const rows=[['التاريخ','المدرسة','النوع',...(names?['اسم الطالبة']:[]),'الحالة'],...reportData().map(e=>[e.date,schoolName(e.school_code),e.type,...(names?[e.student_name||byId(e.student_id)]:[]),e.status])];const safe=x=>{let v=String(x??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};download('تقرير-الموجهة-'+today()+'.csv','\ufeff'+rows.map(row=>row.map(safe).join(',')).join('\r\n'),'text/csv;charset=utf-8')}
+function exportCSV(){
+ const names=$('showNames').checked;
+ const rows=[['التاريخ','المدرسة','القسم',...(names?['اسم الطالبة']:[]),'موضوع الحالة','التفاصيل والملاحظات','الإجراء المتخذ','حالة المتابعة'],
+ ...reportData().map(e=>[
+   e.date||'',schoolName(e.school_code),e.type,
+   ...(names?[e.student_name||byId(e.student_id)]:[]),
+   subjectFor(e),detailsFor(e),actionFor(e)||'لم يُدوّن إجراء',statusFor(e)
+ ])];
+ // Prevent formula execution when exported CSV is opened in Excel.
+ const safe=x=>{let v=String(x??'');if(/^[=+\-@\t\r]/.test(v))v="'"+v;return '"'+v.replace(/"/g,'""')+'"'};
+ download('تقرير-الموجهة-'+today()+'.csv','\ufeff'+rows.map(row=>row.map(safe).join(',')).join('\r\n'),'text/csv;charset=utf-8')
+}
 async function syncCloud(){
  if(!CloudClient.ready()||busy)return;
  busy=true;
