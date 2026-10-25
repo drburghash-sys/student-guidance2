@@ -6,7 +6,7 @@
 </style></head><body><div class="migrate">
 <p><a href="./">العودة إلى التطبيق الجديد</a></p>
 <div class="panel"><h1>فحص وترحيل النسخة القديمة</h1><p>تفحص هذه الصفحة بيانات المصدر محليًا دون تعديل الإصدار القديم أو إرسالها إلى GitHub.</p>
-<div class="notice"><b>سرية بيانات الطالبات:</b> تحتوي النسخة القديمة على معلومات صحية واجتماعية وأرقام أولياء أمور. لا تستخدمي إلا جهازًا موثوقًا. النقل السحابي محجوب حتى اعتماد الاستضافة والتأكد من هوية الموجّهة والصلاحيات والنسخ الاحتياطي.</div></div>
+<div class="notice"><b>سرية بيانات الطالبات:</b> تحتوي النسخة القديمة على معلومات صحية واجتماعية وأرقام أولياء أمور. لا تستخدمي إلا جهازًا موثوقًا. نقل بيانات الطالبات الحقيقية إلى Firebase معطل حتى الموافقة المكتوبة واعتماد الأمن والنسخ الاحتياطي.</div></div>
 <div class="panel"><h2>١. فتح النسخة القديمة للمعاينة</h2>
 <div class="actions"><button class="secondary" type="button" id="checkOld">فحص التخزين القديم في هذا المتصفح</button>
 <label class="secondary upload">اختيار ملف النسخة الاحتياطية JSON<input type="file" id="backupFile" accept=".json,application/json" hidden></label></div>
@@ -22,4 +22,4 @@
 <p>عند التفعيل، سيُحفظ الأصل بكل حقوله في جدول أرشيف محمي منفصل، مع ربط سجلات الطالبة كلما أمكن. لن يحذف أي شيء من الملف الأصلي.</p>
 <div class="actions"><button class="primary" type="button" id="transfer" disabled>بدء نقل السجلات إلى الاستضافة المعتمدة</button><button class="secondary" type="button" id="clearPreview">إغلاق المعاينة ومسحها من ذاكرة الصفحة</button></div>
 <p class="note" id="cloudInfo"></p><p class="statusbox" id="progress" role="status"></p></div>
-</div><script src="./config.js"></script><script src="./cloud.js"></script><script src="./migration.js"></script></body></html>
+</div><script src="./config.js"></script><script src="./firebase-sync.js"></script><script src="./migration.js"></script></body></html>
