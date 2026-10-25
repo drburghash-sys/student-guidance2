@@ -5,8 +5,8 @@
 .migrate{max-width:1000px;margin:22px auto;padding:14px}.migrate .panel{padding:20px;margin-bottom:15px}.migrate h1{margin-top:0}.notice{background:#fff5e6;border:1px solid #d5ae70;border-radius:12px;padding:13px;line-height:1.9}.actions{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.note{line-height:1.9}.scroll-table{overflow:auto}.migrate table{border-collapse:collapse;width:100%;font-size:14px}.migrate th,.migrate td{padding:9px 8px;border-bottom:1px solid #ddd;text-align:right;vertical-align:middle}.migrate select{min-width:135px;max-width:100%;padding:7px}.migrate td small{display:block;color:#6b7280}.migrate button:disabled{opacity:.5;cursor:not-allowed}.statusbox{white-space:pre-wrap;line-height:1.9}.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:14px 0}.summary-grid>div{border-radius:12px;border:1px solid #b9c4d7;padding:12px}.summary-grid b{font-size:23px;display:block}.warning-text{color:#8b4513}
 </style></head><body><div class="migrate">
 <p><a href="./">العودة إلى التطبيق الجديد</a></p>
-<div class="panel"><h1>فحص وترحيل النسخة القديمة</h1><p>تفحص هذه الصفحة بيانات المصدر محليًا دون تعديل الإصدار القديم أو إرسالها إلى GitHub.</p>
-<div class="notice"><b>سرية بيانات الطالبات:</b> تحتوي النسخة القديمة على معلومات صحية واجتماعية وأرقام أولياء أمور. لا تستخدمي إلا جهازًا موثوقًا. نقل بيانات الطالبات الحقيقية إلى Firebase معطل حتى الموافقة المكتوبة واعتماد الأمن والنسخ الاحتياطي.</div></div>
+<div class="panel"><h1>فحص وترحيل النسخة القديمة</h1><p>تفحص هذه الصفحة بيانات المصدر محليًا دون تعديل الإصدار القديم أو إرسالها إلى GitHub. اختيار الملف وحده لا يرسل شيئًا إلى Firebase.</p>
+<div class="notice"><b>سرية بيانات الطالبات:</b> تحتوي النسخة القديمة على معلومات صحية واجتماعية وأرقام أولياء أمور. لا تستخدمي إلا جهازًا موثوقًا. لن يبدأ نقل بيانات الطالبات إلى Firebase حتى تراجعي تصنيف المدرستين وتؤكدي التصريح والنسخة الاحتياطية. لا تُرفع الملفات إلى GitHub.</div></div>
 <div class="panel"><h2>١. فتح النسخة القديمة للمعاينة</h2>
 <div class="actions"><button class="secondary" type="button" id="checkOld">فحص التخزين القديم في هذا المتصفح</button>
 <label class="secondary upload">اختيار ملف النسخة الاحتياطية JSON<input type="file" id="backupFile" accept=".json,application/json" hidden></label></div>
@@ -18,8 +18,13 @@
 <div class="panel"><h2>٣. مراجعة السجلات التي لا يمكن تحديد مدرستها</h2>
 <p>اختاري المدرسة لكل سجل غير محسوم. تبقى السجلات بأسماء متعددة محفوظة كما هي؛ لن نفترض أنها اسم طالبة واحدة.</p><div id="reviewList" class="scroll-table"></div>
 <p class="note warning-text" id="qualityMessage"></p></div>
-<div class="panel"><h2>٤. الترحيل الآمن بعد الاعتماد</h2>
-<p>عند التفعيل، سيُحفظ الأصل بكل حقوله في جدول أرشيف محمي منفصل، مع ربط سجلات الطالبة كلما أمكن. لن يحذف أي شيء من الملف الأصلي.</p>
-<div class="actions"><button class="primary" type="button" id="transfer" disabled>بدء نقل السجلات إلى الاستضافة المعتمدة</button><button class="secondary" type="button" id="clearPreview">إغلاق المعاينة ومسحها من ذاكرة الصفحة</button></div>
+<div class="panel"><h2>٤. الترحيل إلى Firebase بعد مراجعة التفويض</h2>
+<p>بعد تحديد المدارس، سيُحفظ كل سجل أصلي بأكمله في الأرشيف، وتُنشأ له نسخة قابلة للبحث والتقرير. تُنشأ ملفات الطالبات للأسماء الواضحة فقط، دون دمج أسماء متشابهة أو متعددة. لن يغير التطبيق النسخة القديمة، لكن بدء النقل يرسل معلومات حساسة إلى Firebase.</p>
+<div class="notice"><b>قبل الرفع:</b> لا تُنقل البيانات الفعلية إلا عندما توافق الجهة التعليمية المسؤولة صراحة على حفظ سجلات الطالبات في مشروع Firebase المختار ومنطقة تخزينه، وعلى استخدام الأجهزة الشخصية. تسجيل الدخول وحده لا يشكّل هذه الموافقة.</div>
+<div style="display:grid;gap:12px;margin:15px 0">
+<label><input type="checkbox" id="authorizedImport"> أؤكد أن لدي تفويضًا من الجهة المسؤولة عن بيانات الطالبات لنقلها إلى Firebase.</label>
+<label><input type="checkbox" id="keepBackup"> أؤكد أن لدي نسخة JSON احتياطية أصلية محفوظة في مكان آمن ولن أحذف البرنامج القديم.</label>
+</div>
+<div class="actions"><button class="primary" type="button" id="transfer" disabled>بدء استيراد البيانات إلى Firebase</button><button class="secondary" type="button" id="clearPreview">إغلاق المعاينة ومسحها من ذاكرة الصفحة</button></div>
 <p class="note" id="cloudInfo"></p><p class="statusbox" id="progress" role="status"></p></div>
-</div><script src="./config.js"></script><script src="./firebase-sync.js"></script><script src="./migration.js"></script></body></html>
+</div><script src="./config.js?v=20261025-migrate-v3"></script><script src="./firebase-sync.js?v=20261025-migrate-v3"></script><script src="./migration.js?v=20261025-migrate-v3"></script></body></html>
