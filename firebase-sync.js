@@ -7,7 +7,11 @@
   const config = window.GUIDANCE_FIREBASE || {};
   const sdk = 'https://www.gstatic.com/firebasejs/13.1.0/';
   const validTables = new Set(['students','entries','tasks','legacy_records']);
-  const enabled = () => Boolean(config.apiKey && config.projectId && config.authDomain && config.appId && config.allowedUid && config.mode === 'demo');
+  const enabled = () => Boolean(config.apiKey && config.projectId && config.authDomain && config.appId && config.mode === 'demo');
+  // Authentication may be bootstrapped without a UID. Firestore still requires
+  // BOTH an approved UID in client config and server-side Firestore rules.
+  const emailKey = 'guidance2-pending-email-' + String(config.projectId||'sandbox');
+  let emailConfirmationRequired = false;
   let contextPromise = null, authUser = null, listeners = [];
   let notifyAuth = () => {};
 
@@ -28,12 +32,14 @@
       // unencrypted. All real student data remains disallowed at this stage.
       const db = storeLib.initializeFirestore(app,{localCache:storeLib.memoryLocalCache()});
       authLib.onAuthStateChanged(auth, user => {
+        lastAuthenticatedUser=user;
         authUser = user && user.uid===config.allowedUid
           ? { id:user.uid, uid:user.uid, email:user.email } : null;
         if(!authUser){for(const unsub of listeners.splice(0))unsub();}
         notifyAuth(authUser);
       });
       await auth.authStateReady();
+      lastAuthenticatedUser=auth.currentUser;
       authUser = auth.currentUser?.uid===config.allowedUid
         ? {id:auth.currentUser.uid,uid:auth.currentUser.uid,email:auth.currentUser.email} : null;
       return {auth,authLib,storeLib,db};
@@ -45,21 +51,59 @@
     if(!ctx.auth.currentUser || ctx.auth.currentUser.uid !== config.allowedUid)return null;
     return {user:{id:ctx.auth.currentUser.uid,email:ctx.auth.currentUser.email}};
   }
-  async function signIn(email,password) {
+  async function sendEmailLink(email) {
     const c = await initialize();
-    const credential = await c.authLib.signInWithEmailAndPassword(c.auth,email,password);
-    if(credential.user.uid!==config.allowedUid){
-      await c.authLib.signOut(c.auth);
-      throw Error('الحساب ليس حساب الموجّهة المصرح به لهذا المشروع.');
-    }
-    authUser={id:credential.user.uid,uid:credential.user.uid,email:credential.user.email};
-    return authUser;
+    const address = String(email||'').trim();
+    if(!address || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))
+      throw Error('أدخلي بريدًا إلكترونيًا صحيحًا.');
+    // This continuation must be on Firebase Auth's Authorized domains list.
+    // Fixed URL: cannot be influenced by the page's untrusted query string.
+    const redirectUrl = config.emailLinkUrl;
+    if(!/^https:\/\/[a-z0-9.-]+(?:\/[a-zA-Z0-9_/.~-]*)?\/$/.test(String(redirectUrl||'')))
+      throw Error('عنوان العودة بعد تسجيل الدخول غير مضبوط.');
+    await c.authLib.sendSignInLinkToEmail(c.auth,address,{
+      url:redirectUrl,
+      handleCodeInApp:true
+    });
+    // Only the address is saved on this device, never the one-time code.
+    window.localStorage.setItem(emailKey,address);
+    return true;
   }
+  async function completeEmailLink(email) {
+    const c = await initialize();
+    const link = window.location.href;
+    if(!c.authLib.isSignInWithEmailLink(c.auth,link))
+      throw Error('الرابط ليس رابط دخول Firebase صالحًا.');
+    const address=String(email||'').trim();
+    if(!address)throw Error('أدخلي البريد الذي وصله رابط الدخول.');
+    const result=await c.authLib.signInWithEmailLink(c.auth,address,link);
+    window.localStorage.removeItem(emailKey);
+    emailConfirmationRequired=false;
+    // Discard one-time sign-in code from browser history after redemption.
+    window.history.replaceState(null,'',window.location.pathname);
+    authUser=result.user.uid===config.allowedUid
+      ? {id:result.user.uid,uid:result.user.uid,email:result.user.email}
+      : null;
+    notifyAuth(authUser);
+    return {uid:result.user.uid,allowed:!!authUser,email:result.user.email};
+  }
+  async function processIncomingEmailLink(){
+    const c=await initialize();
+    if(!c.authLib.isSignInWithEmailLink(c.auth,window.location.href))return false;
+    const remembered=window.localStorage.getItem(emailKey);
+    if(!remembered){emailConfirmationRequired=true;notifyAuth(authUser);return true}
+    await completeEmailLink(remembered);
+    return true;
+  }
+  const needsEmailConfirmation=()=>emailConfirmationRequired;
+  let lastAuthenticatedUser=null;
+  const bootstrapUid=()=>!config.allowedUid&&lastAuthenticatedUser?.emailVerified
+    ?lastAuthenticatedUser.uid:null;
   async function signOut() {
     if(!enabled())return;
     const c=await initialize();
     for(const unsub of listeners.splice(0))unsub();
-    await c.authLib.signOut(c.auth);authUser=null;notifyAuth(null);
+    await c.authLib.signOut(c.auth);authUser=null;lastAuthenticatedUser=null;emailConfirmationRequired=false;window.localStorage.removeItem(emailKey);notifyAuth(null);
   }
   function requireTable(table) {
     if(!validTables.has(table))throw Error('جدول غير معتمد: '+table);
@@ -117,7 +161,8 @@
     ready:enabled,
     user:()=>authUser,
     setAuthObserver:callback=>{notifyAuth=callback;},
-    ensureSession,signIn,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,
+    ensureSession,sendEmailLink,completeEmailLink,processIncomingEmailLink,
+    needsEmailConfirmation,bootstrapUid,signOut,upsert,fetchAll,startListeners,insertManyIfMissing,
     allowLegacyImport:()=>config.mode==='approved'&&config.allowLegacyImport===true
   };
 })();
